@@ -11,7 +11,7 @@
  * ask "what type is this variable?" without regex guessing.
  */
 
-const WIDE_SET = new Set(['u128', 'u256']);
+export const WIDE_TYPES = new Set(['u128', 'u256']);
 
 /**
  * Parse a Move source file into module-level structure.
@@ -297,7 +297,7 @@ function parseBody(bodyLines, offset) {
         const tokens = expr.match(/\w+/g) || [];
         for (const tok of tokens) {
           const tokType = varTypes[tok];
-          if (tokType && WIDE_SET.has(tokType)) {
+          if (tokType && WIDE_TYPES.has(tokType)) {
             variables.push({ name: vname, type: tokType, line: lineNo });
             varTypes[vname] = tokType;
             break;

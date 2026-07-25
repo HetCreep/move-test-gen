@@ -15,13 +15,11 @@
  * the multiplication is safe and not flagged.
  */
 
-import { parseModule, getVarType } from '../scripts/move-parser.mjs';
+import { parseModule, getVarType, WIDE_TYPES } from '../scripts/move-parser.mjs';
 
 const RULE_ID = 'MOV-002';
 const SEVERITY = 'HIGH';
 const TITLE = 'integer multiplication may overflow without u128 promotion';
-
-const WIDE_TYPES = new Set(['u128', 'u256']);
 
 /**
  * @param {string} source

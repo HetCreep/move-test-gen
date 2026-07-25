@@ -25,7 +25,9 @@ import { filterByScope } from './scope-filter.mjs';
 
 function walkDir(dir, ext) {
   const results = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+  let entries;
+  try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return results; }
+  for (const entry of entries) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) results.push(...walkDir(full, ext));
     else if (entry.name.endsWith(ext)) results.push(full);
@@ -271,12 +273,14 @@ function runMutations(packageDir, sourceDir, scopeFilter) {
     try { rmSync(tempDir, { recursive: true, force: true }); } catch {}
   };
 
-  // handle SIGINT gracefully
-  process.on('SIGINT', () => {
-    console.log('\nInterrupted — cleaning up temp directory...');
+  // handle SIGINT/SIGTERM gracefully (CI sends SIGTERM on timeout)
+  const onSignal = (sig) => {
+    console.log(`\n${sig} — cleaning up temp directory...`);
     cleanup();
-    process.exit(130);
-  });
+    process.exit(sig === 'SIGINT' ? 130 : 143);
+  };
+  process.on('SIGINT', () => onSignal('SIGINT'));
+  process.on('SIGTERM', () => onSignal('SIGTERM'));
 
   try {
     for (const srcFile of sourceFiles) {
