@@ -1,4 +1,6 @@
-# move-test-gen eval lab — Campaign 1 digest
+# move-test-gen eval lab
+
+## Campaign 1 — generation baseline
 
 <!-- version-frozen: figures below are filled from eval/results/*/rounds.json (dated records).
      Never edit a figure without a matching record. -->
@@ -66,7 +68,7 @@ The mutation-testing layer itself (`--mutate`) also began as their suggestion �
 
 ---
 
-# Campaign 2 — the survivor path
+## Campaign 2 — the survivor path
 
 **Measured:** 2026-07-16 · repo state through `e8d463f` · gate: v1.1 (`bd521f9` → `6957be1`, survivor reframe + measured mutual-redundancy probe; `eval/gate-selftest` 6/6 green, CI-attested) · engine: agent VM · `sui 1.74.1-8fc60f1fa966` · pin `mainnet-v1.74.1` · generator model: `Claude 4.8` — a **fresh session on a different model family from the build agent (GPT-5.5)**, so generation was isolated from the answer key at both the context and the weight level · prompts: frozen templates v1.1.
 
@@ -105,7 +107,7 @@ The assignment — plant a true equivalent, flip the pass condition to a confess
 
 ---
 
-# Campaign 3 — real protocol
+## Campaign 3 — real protocol
 
 **Measured:** 2026-07-17 · repo state through `3a0890e` · gate: v1.1 with `--scope` filter (`eval/gate-selftest` 7/7 green, CI-attested) · engine: agent VM · generator model: `GPT-5.5` (all three scenarios, same session) · `sui 1.74.1-8fc60f1fa966` · pin `mainnet-v1.74.1` · prompts: frozen templates v1.1 · source: [Interest Protocol / SuiTears](https://github.com/interest-protocol/suitears) at `f39693a00e23`.
 
@@ -141,7 +143,7 @@ The assignment — plant a true equivalent, flip the pass condition to a confess
 
 ---
 
-# Campaign 4 — Layer 1 real-protocol validation + cross-team diversity
+## Campaign 4 — Layer 1 real-protocol validation + cross-team diversity
 
 **Measured:** 2026-07-19 · repo state through `38da391` · gate: v1.1 with `--scope` filter (`eval/gate-selftest` 7/7 green, CI-attested) · engine: agent VM · generator model: `GPT-5.5` (all rounds, same session) · `sui 1.74.1-8fc60f1fa966` · pin `mainnet-v1.74.1` · prompts: frozen templates v1.1 · sources: [Interest Protocol / SuiTears](https://github.com/interest-protocol/suitears) at `f39693a00e23` + [CetusProtocol / IntegerMate](https://github.com/CetusProtocol/integer-mate) HEAD at time of clone.
 
@@ -183,7 +185,7 @@ Total: 12 scenarios, 43 rounds, all RETIRED.
 
 ---
 
-# Campaign 5 — cross-family independent measurement
+## Campaign 5 — cross-family independent measurement
 
 **Measured:** 2026-07-20 · repo state through `322004e` · gate: v1.1 with `--scope` filter (`eval/gate-selftest` 10/10 green) · engine: Venice.ai API · generator models: `DeepSeek-v4-pro` (rounds 1–2, independent), `Qwen3-Coder-480B` (attempted, failed) · `sui 1.74.1-8fc60f1fa966` · pin `mainnet-v1.74.1` · prompts: frozen template text sent via API (each call is a fresh context — no memory of prior rounds).
 
