@@ -237,4 +237,4 @@ Total: 12 scenarios, 43 rounds, all RETIRED.
 | 4 (L1 validation) | 10–11 | 9 | **14/14, 15/15** | peak 95%, 87.5% | Layer 1 field-proven |
 | 5 (cross-family) | 12 | 2 (valid) | **5/5** | peak 87.5% | independent + cross-family |
 
-Total: 13 scenarios, 47 rounds (45 valid), all campaigns closed or data-complete.
+Total: 13 scenarios, 46 rounds (44 valid), all campaigns closed or data-complete.

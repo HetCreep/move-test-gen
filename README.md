@@ -164,7 +164,7 @@ The skill is measured, not trusted: `eval/` holds a scenario lab that fires froz
 prompt templates at bait modules and scores every round with the gate — retirement
 by saturation, dated records, figures never edited by hand. Five campaigns closed:
 fixtures (53/53), honesty channel, real protocol (SuiTears), Layer 1 validation
-(SuiTears + Cetus), and cross-family (DeepSeek vs GPT-5.5). 13 scenarios, 47
+(SuiTears + Cetus), and cross-family (DeepSeek vs GPT-5.5). 13 scenarios, 46
 rounds. Full records: [eval/RESULTS.md](eval/RESULTS.md).
 
 The lab's methodology — the retirement protocol, frozen templates, and the honesty-
