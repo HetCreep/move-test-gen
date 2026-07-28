@@ -552,3 +552,26 @@ if (doLint) {
     process.exitCode = 1;
   }
 }
+
+// Testability pre-flight (runs with --lint or standalone --testability)
+if (doLint || args.includes('--testability')) {
+  const { readFileSync } = await import('fs');
+  const { basename } = await import('path');
+  const { checkTestability } = await import('./testability.mjs');
+  const { walkDir: walkSrc } = await import('./walk-dir.mjs');
+  const srcFiles = walkSrc(sourceDir, '.move');
+  const testWarnings = [];
+  for (const f of srcFiles) {
+    const src = readFileSync(f, 'utf8');
+    const mod = basename(f, '.move');
+    const { warnings } = checkTestability(src, mod);
+    testWarnings.push(...warnings);
+  }
+  if (testWarnings.length > 0) {
+    console.log(`\n=== Testability Pre-flight (${testWarnings.length} warning(s)) ===\n`);
+    for (const w of testWarnings) {
+      const icon = w.level === 'blocker' ? '🔴' : '🟡';
+      console.log(`  ${icon} ${w.level.toUpperCase()}  ${w.message}`);
+    }
+  }
+}
