@@ -5,6 +5,12 @@
  * #[test_only] constructor or public constructor. If abort paths require
  * objects that can't be created in tests, the module is untestable.
  *
+ * Two severity levels (forum feedback from forums.sui.io — ercan):
+ *   blocker — no constructor at all; the struct cannot be built in tests
+ *   cost    — constructible through a heavy chain (e.g. OTW → create_currency
+ *             → CoinMetadata via a separate test coin module); possible but
+ *             expensive to set up
+ *
  * Pure function, no I/O beyond reading the file content passed in.
  */
 
@@ -13,7 +19,7 @@
  *
  * @param {string} source - file content of a .move source file
  * @param {string} moduleName - module name for reporting
- * @returns {{ testable: boolean, warnings: string[] }}
+ * @returns {{ testable: boolean, warnings: { message: string, level: 'blocker'|'cost' }[] }}
  */
 export function checkTestability(source, moduleName) {
   const warnings = [];
@@ -58,14 +64,22 @@ export function checkTestability(source, moduleName) {
   for (const [, fnName, params] of publicFns) {
     for (const s of unconstructible) {
       if (params.includes(s) && !params.includes(`&${s}`) && fnName !== 'destroy' && !fnName.includes('testing')) {
-        warnings.push(`${moduleName}::${fnName} takes ${s} but no test constructor found for ${s}`);
+        warnings.push({
+          message: `${moduleName}::${fnName} takes ${s} but no test constructor found for ${s}`,
+          level: 'blocker',
+        });
       }
     }
   }
 
-  // check specifically for CoinMetadata pattern (farm's problem)
+  // CoinMetadata pattern — constructible via a separate test coin module
+  // (OTW → create_currency → CoinMetadata), but expensive to set up.
+  // Level: cost, not blocker — the path exists, it's just heavy.
   if (source.includes('CoinMetadata') && !source.includes('test_only')) {
-    warnings.push(`${moduleName} uses CoinMetadata but has no #[test_only] helpers — abort paths behind CoinMetadata are likely untestable`);
+    warnings.push({
+      message: `${moduleName} uses CoinMetadata without #[test_only] helpers — constructible via a separate test coin module (OTW → create_currency), but the setup chain is heavy`,
+      level: 'cost',
+    });
   }
 
   const testable = warnings.length === 0;

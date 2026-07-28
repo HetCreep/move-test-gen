@@ -18,7 +18,8 @@ module example::farm {
 }`;
 const r1 = checkTestability(farmLike, 'farm');
 check('farm-like: not testable', r1.testable === false);
-check('farm-like: has CoinMetadata warning', r1.warnings.some(w => w.includes('CoinMetadata')));
+check('farm-like: has CoinMetadata warning', r1.warnings.some(w => w.message.includes('CoinMetadata')));
+check('farm-like: CoinMetadata is cost not blocker', r1.warnings.find(w => w.message.includes('CoinMetadata'))?.level === 'cost');
 
 // Case 2: module with test_only constructor — should pass (vault pattern)
 const vaultLike = `
