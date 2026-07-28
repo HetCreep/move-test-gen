@@ -20,20 +20,9 @@ import { execSync } from 'child_process';
 import { tmpdir } from 'os';
 import { identifyProbeCandidates, finalizeEvidence } from './classify.mjs';
 import { filterByScope } from './scope-filter.mjs';
+import { walkDir } from './walk-dir.mjs';
 
 // ── helpers ──────────────────────────────────────────────────────────
-
-function walkDir(dir, ext) {
-  const results = [];
-  let entries;
-  try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return results; }
-  for (const entry of entries) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) results.push(...walkDir(full, ext));
-    else if (entry.name.endsWith(ext)) results.push(full);
-  }
-  return results;
-}
 
 function stripComment(line) {
   // Remove trailing // comment, but not inside string literals

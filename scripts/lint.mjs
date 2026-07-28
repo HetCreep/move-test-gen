@@ -18,21 +18,10 @@
 import { readdirSync, readFileSync } from 'fs';
 import { join, resolve, relative, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { walkDir } from './walk-dir.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const RULES_DIR = join(here, '..', 'rules');
-
-function walkDir(dir, ext) {
-  const results = [];
-  let entries;
-  try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return results; }
-  for (const entry of entries) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) results.push(...walkDir(full, ext));
-    else if (entry.name.endsWith(ext)) results.push(full);
-  }
-  return results;
-}
 
 /**
  * Run all lint rules against source files.
