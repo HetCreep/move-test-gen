@@ -290,6 +290,75 @@ assert('MOV-004: skips mul_div library function', check004(lib_downcast, 'math.m
 assert('MOV-004: skips known-small field (duration)', check004(small_field_downcast, 'limiter.move').length === 0);
 assert('MOV-004: skips #[test] function', check004(test_downcast, 'test.move').length === 0);
 
+// ── MOV-005: unused auth result (Typus pattern) ────────────────────
+
+import { check as check005 } from '../../../../rules/mov-005-unused-auth-result.mjs';
+
+const unsafe_auth = `
+module typus_oracle::oracle {
+    public struct UpdateAuthority has key { id: UID, authority: vector<address> }
+    public struct Oracle has key { id: UID, price: u64 }
+    public fun update_v2(
+        oracle: &mut Oracle,
+        update_authority: &UpdateAuthority,
+        price: u64,
+        ctx: &mut TxContext
+    ) {
+        vector::contains(&update_authority.authority, &tx_context::sender(ctx));
+        oracle.price = price;
+    }
+}`;
+
+const safe_auth_assert = `
+module typus_oracle::oracle {
+    public struct UpdateAuthority has key { id: UID, authority: vector<address> }
+    public struct Oracle has key { id: UID, price: u64 }
+    public fun update_safe(
+        oracle: &mut Oracle,
+        update_authority: &UpdateAuthority,
+        price: u64,
+        ctx: &mut TxContext
+    ) {
+        assert!(vector::contains(&update_authority.authority, &tx_context::sender(ctx)), 0);
+        oracle.price = price;
+    }
+}`;
+
+const safe_auth_let = `
+module example::access {
+    public fun check_access(whitelist: &vector<address>, ctx: &TxContext): bool {
+        let authorized = vector::contains(whitelist, &tx_context::sender(ctx));
+        authorized
+    }
+}`;
+
+const safe_auth_if = `
+module example::access {
+    public fun guarded_op(whitelist: &vector<address>, ctx: &TxContext) {
+        if (vector::contains(whitelist, &tx_context::sender(ctx))) {
+            do_something();
+        };
+    }
+}`;
+
+const test_auth = `
+module example::access {
+    #[test]
+    public fun test_auth(whitelist: &vector<address>, ctx: &TxContext) {
+        vector::contains(whitelist, &tx_context::sender(ctx));
+    }
+}`;
+
+const r005a = check005(unsafe_auth, 'oracle.move');
+assert('MOV-005: flags discarded vector::contains', r005a.length === 1);
+assert('MOV-005: rule ID correct', r005a[0].rule === 'MOV-005');
+assert('MOV-005: severity HIGH', r005a[0].severity === 'HIGH');
+
+assert('MOV-005: passes with assert!', check005(safe_auth_assert, 'oracle.move').length === 0);
+assert('MOV-005: passes with let binding', check005(safe_auth_let, 'access.move').length === 0);
+assert('MOV-005: passes with if condition', check005(safe_auth_if, 'access.move').length === 0);
+assert('MOV-005: skips #[test] function', check005(test_auth, 'test.move').length === 0);
+
 // ── Summary ──────────────────────────────────────────────────────────
 
 if (errs.length) {
