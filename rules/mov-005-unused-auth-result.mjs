@@ -20,6 +20,9 @@ const RULE_ID = 'MOV-005';
 const SEVERITY = 'HIGH';
 const TITLE = 'authorization check result discarded';
 
+// Only bool-returning functions. Void functions that abort internally
+// (like Typus's admin::verify() which asserts inside) are NOT flagged —
+// calling them without binding the result is correct because there is no result.
 const AUTH_PATTERNS = [
   /vector::contains\s*\(/,
   /\w+::contains\s*\(/,
@@ -30,8 +33,6 @@ const AUTH_PATTERNS = [
   /\bis_admin\s*\(/,
   /\bis_owner\s*\(/,
   /\bis_valid\s*\(/,
-  /\bcheck_auth\w*\s*\(/,
-  /\bverify\s*\(/,
   /\bhas_role\s*\(/,
   /\bhas_permission\s*\(/,
 ];
