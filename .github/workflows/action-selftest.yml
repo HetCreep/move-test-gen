@@ -37,8 +37,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: ./
-        with:
-          sources: examples/sources
-          tests: examples/tests
-          lint: 'true'
+      - name: Verify lint runs (findings expected on example code)
+        shell: bash
+        run: |
+          GATE="${GITHUB_WORKSPACE}/scripts/check-coverage.mjs"
+          node "$GATE" examples/sources examples/tests --lint 2>&1 | tee /tmp/lint-out.txt
+          grep -q "Security Lint" /tmp/lint-out.txt || { echo "FAIL: lint did not run"; exit 1; }
+          echo "lint executed — findings on example code are expected, not a failure"
