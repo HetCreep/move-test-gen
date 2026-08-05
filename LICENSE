@@ -22,7 +22,13 @@ SOFTWARE.
 
 ---
 
-eval/scenarios/07-suitears-fund/, eval/scenarios/08-suitears-oracle/, and
-eval/scenarios/09-suitears-farm/ contain source code from Interest Protocol /
-SuiTears (https://github.com/interest-protocol/suitears), used under the
-MIT License. Copyright (c) Interest Protocol.
+eval/scenarios/07-suitears-fund/, eval/scenarios/08-suitears-oracle/,
+eval/scenarios/09-suitears-farm/, and eval/scenarios/10-suitears-fixedpoint/
+contain source code from Interest Protocol / SuiTears
+(https://github.com/interest-protocol/suitears), used under the MIT License.
+Copyright (c) Interest Protocol.
+
+eval/scenarios/11-cetus-i128/ and eval/scenarios/12-brain-i128/ contain
+source code from Cetus Protocol / IntegerMate
+(https://github.com/CetusProtocol/integer-mate), used under the MIT License.
+Copyright (c) Cetus Protocol.
