@@ -20,6 +20,19 @@ trusting any gate change, and in CI.
 | 03-disabled-test-ignored | A commented-out `#[expected_failure(...)]` attribute does not count as coverage. |
 | 04-shared-code-warning | Two functions sharing one abort code → the shared-code warning fires. |
 | 05-known-tail-one-line | KNOWN LIMITATION pinned on purpose: two asserts on one line — the greedy regex sees only the last. If this case ever fails by finding both, the limitation was fixed: update the README and re-pin. |
+| 06-survivor-classify | The `classify.mjs` pure function: redundant drop-assert pair → suspected-equivalent evidence; solo survivors → no evidence; zero survivors → empty. |
+| 07-scope-filter | The `--scope` flag: mutations only applied to target files, non-target files untouched in Layer 2. |
+| 08-baseline-zero-tests | Baseline 0-tests warning: `--mutate` on an empty tests dir must warn and exit 1, not silently pass. |
+| 09-scope-pure-fn | The `scope-filter.mjs` pure function: only files ending with scope entries pass through. |
+| 10-testability-check | Testability pre-flight: modules with CoinMetadata + no `#[test_only]` warn; modules with constructors pass. |
+| 11-lint-rules | All 6 lint rules (MOV-001 through MOV-006): synthetic Move source, no sui needed. Pins positive detection, false-positive suppression, and test-function skip for each rule. |
+
+## Known limitations
+
+- **Two asserts on one line** — the greedy regex sees only the last abort code. Case 05 pins this.
+- **Multi-line attributes** — `#[expected_failure(...)]` split across lines is not detected. Keep attributes on one line.
+- **Mutation testing** requires `sui` CLI installed locally. Layer 1 (assert pairing) works anywhere.
+- **Abort code pairing** is by error constant name, not by which function throws it. If two functions use the same error constant, one test covers both — the checker warns about this but does not flag it as unpaired.
 
 What this does **not** prove: Layer 2 (`--mutate`) behavior — that path needs a
 real `sui` CLI and is field-verified separately (see the review thread record).

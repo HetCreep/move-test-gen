@@ -96,7 +96,7 @@ Rules are pure functions in `rules/*.mjs`. The engine skips `#[test_only]` modul
 
 MOV-001 recognizes several Sui Move access control idioms beyond `*Cap`: `Witness<T>`, `Version`, `*Key`, and user-asset parameters (`Coin<T>`, `Balance<T>`, LP tokens) that make a function intentionally permissionless. MOV-005 only flags bool-returning functions (not void functions like `verify()` that abort internally). MOV-006 filters lowercase variable names to avoid flagging parameters used as abort arguments.
 
-Validated against Kriya DEX, Scallop lending (172 files), Bucket Protocol, Turbos CLMM, SuiTears, and Typus Finance. MOV-005 catches the exact vulnerability that caused the [Typus Finance $3.44M exploit](https://mehvetero.com) (Oct 2025).
+**Lab-recorded** (eval scenarios with dated round records): SuiTears and Cetus IntegerMate. **Manual spot-checks** (run outside the lab, no round record): Kriya DEX, Scallop (172 files, 82→1 FP reduction), Bucket Protocol, Turbos CLMM, Typus Finance. MOV-005 catches the exact vulnerability that caused the [Typus Finance $3.44M exploit](https://mehvetero.com) (Oct 2025).
 
 Or run lint standalone:
 
@@ -128,6 +128,7 @@ The skill aims for:
 
 The checker is a regex-based parser, not a compiler. It handles the common patterns — including multi-line asserts, module-qualified aborts, and string literals with `//` — but edge cases exist:
 
+- **Two asserts on one line** — the greedy regex sees only the last abort code. Pinned in selftest case 05.
 - **Multi-line attributes** — `#[expected_failure(...)]` split across lines is not detected. Keep attributes on a single line.
 - **Mutation testing** requires `sui` CLI installed locally. Layer 1 (assert pairing) works anywhere.
 - **Abort code pairing** is by error constant name, not by which function throws it. If two functions use the same `EZeroAmount`, one `#[expected_failure]` test covers both — the checker warns about this but does not flag it as unpaired.
