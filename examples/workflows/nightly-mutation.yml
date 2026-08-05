@@ -17,7 +17,7 @@ jobs:
           sudo mv sui /usr/local/bin/
           rm sui.tgz
           sui --version
-      - uses: mehvetero/move-test-gen@v1.1.0
+      - uses: mehvetero/move-test-gen@v1.4.0
         with:
           sources: sources
           tests: tests
