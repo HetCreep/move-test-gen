@@ -535,12 +535,14 @@ if (unpaired.length > 0) {
   console.log(`⚠ ${unpaired.length} assert(s) have no expected_failure test`);
   process.exitCode = 1;
 }
-if (mutationSkipped) {
-  console.log('⚠ All asserts paired, but --mutate was requested and could not run');
-} else if (mutationWeak) {
-  console.log('✓ All asserts paired, but mutation testing found weaknesses (see above)');
-} else {
-  console.log('✓ All asserts have matching expected_failure tests');
+if (unpaired.length === 0) {
+  if (mutationSkipped) {
+    console.log('⚠ All asserts paired, but --mutate was requested and could not run');
+  } else if (mutationWeak) {
+    console.log('✓ All asserts paired, but mutation testing found weaknesses (see above)');
+  } else {
+    console.log('✓ All asserts have matching expected_failure tests');
+  }
 }
 
 // Security lint (optional)

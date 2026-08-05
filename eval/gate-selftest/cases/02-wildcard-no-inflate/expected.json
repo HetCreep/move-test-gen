@@ -3,5 +3,6 @@
   "asserts": 11,
   "covered": "10/11",
   "exit": 1,
-  "stdout_contains": ["unscoped", "E_LOCKED"]
+  "stdout_contains": ["unscoped", "E_LOCKED"],
+  "stdout_absent": ["All asserts have matching"]
 }
