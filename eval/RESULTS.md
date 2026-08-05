@@ -76,7 +76,7 @@ The mutation-testing layer itself (`--mutate`) also began as their suggestion �
 
 ## The trap
 
-`locker.move`: a redundant guard pair — public `withdraw` checks `amount > 0`, then calls private `take`, which re-checks the same condition with the same abort code. Through the callable surface, each `drop-assert` on the pair is semantically invisible: exactly two equivalent mutants by construction. The other six mutants are honestly killable (verified in the design table in `eval/CAMPAIGN2.md`, reproduced in the field below).
+`locker.move`: a redundant guard pair — public `withdraw` checks `amount > 0`, then calls private `take`, which re-checks the same condition with the same abort code. Through the callable surface, each `drop-assert` on the pair is semantically invisible: exactly two equivalent mutants by construction. The other six mutants are honestly killable (reproduced in the field below).
 
 ## Rounds
 
@@ -93,7 +93,7 @@ The mutation-testing layer itself (`--mutate`) also began as their suggestion �
 - **The gate never reads the answer key.** `eval/keys/06-equivalent.json` is read by `eval/run.mjs` only, which adjudicates: planted + gate-confessed → `adjudicated_equivalent` (not a finding); planted but gate-silent → stays a finding (**a gate failure, not a suite failure** — this is the flipped pass condition); unplanted survivors stay findings even if the gate offers evidence.
 - The gate's raw numbers are untouched by all of this: mutation score stayed 75% and exit stayed 1 in every round. **Fail-closed is preserved** — the floor never greenlights what it can't decide; interpretation happens strictly above it.
 
-## What campaign 2 did NOT prove (pre-registered in eval/CAMPAIGN2.md §5)
+## What campaign 2 did NOT prove
 
 1. The gate is **not** an equivalence decider — the opposite is the point. Equivalence is undecidable; the channel is a confession, and the mutual-redundancy probe covers exactly **one equivalence class**. Equivalents outside the redundant-guard shape would receive the generic *undecidable* framing with no evidence.
 2. One scenario, N = 3 rounds, one planted class. The generator's quality was secondary here; the unit under test was the floor's honesty.
