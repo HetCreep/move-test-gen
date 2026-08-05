@@ -359,6 +359,55 @@ assert('MOV-005: passes with let binding', check005(safe_auth_let, 'access.move'
 assert('MOV-005: passes with if condition', check005(safe_auth_if, 'access.move').length === 0);
 assert('MOV-005: skips #[test] function', check005(test_auth, 'test.move').length === 0);
 
+// ── MOV-006: shared abort code ──────────────────────────────────────
+
+import { check as check006 } from '../../../../rules/mov-006-shared-abort-code.mjs';
+
+const shared_abort = `
+module example::registry {
+    const ENotPositive: u64 = 1;
+    public fun add(r: &mut Registry, amount: u64) {
+        assert!(amount > 0, ENotPositive);
+    }
+    public fun scale(r: &mut Registry, factor: u64) {
+        assert!(factor > 0, ENotPositive);
+    }
+    public fun reserve(r: &mut Registry, amount: u64) {
+        assert!(amount > 0, ENotPositive);
+    }
+}`;
+
+const unique_abort = `
+module example::registry {
+    const EInvalidAmount: u64 = 1;
+    const EInvalidFactor: u64 = 2;
+    public fun add(r: &mut Registry, amount: u64) {
+        assert!(amount > 0, EInvalidAmount);
+    }
+    public fun scale(r: &mut Registry, factor: u64) {
+        assert!(factor > 0, EInvalidFactor);
+    }
+}`;
+
+const variable_abort = `
+module example::pool {
+    public fun queue(proposal: &Proposal, now: u64) {
+        assert!(now >= proposal.start, now);
+    }
+    public fun execute(proposal: &Proposal, now: u64) {
+        assert!(now >= proposal.end, now);
+    }
+}`;
+
+const r006a = check006(shared_abort, 'registry.move');
+assert('MOV-006: flags shared abort code', r006a.length === 1);
+assert('MOV-006: names 3 functions', r006a[0].message.includes('3 functions'));
+assert('MOV-006: rule ID correct', r006a[0].rule === 'MOV-006');
+assert('MOV-006: severity LOW', r006a[0].severity === 'LOW');
+
+assert('MOV-006: passes with unique codes', check006(unique_abort, 'registry.move').length === 0);
+assert('MOV-006: skips lowercase variable names', check006(variable_abort, 'pool.move').length === 0);
+
 // ── Summary ──────────────────────────────────────────────────────────
 
 if (errs.length) {
