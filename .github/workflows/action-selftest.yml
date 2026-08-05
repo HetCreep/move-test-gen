@@ -41,6 +41,7 @@ jobs:
         shell: bash
         run: |
           GATE="${GITHUB_WORKSPACE}/scripts/check-coverage.mjs"
-          node "$GATE" examples/sources examples/tests --lint 2>&1 | tee /tmp/lint-out.txt
+          node "$GATE" examples/sources examples/tests --lint > /tmp/lint-out.txt 2>&1 || true
+          cat /tmp/lint-out.txt
           grep -q "Security Lint" /tmp/lint-out.txt || { echo "FAIL: lint did not run"; exit 1; }
           echo "lint executed — findings on example code are expected, not a failure"
