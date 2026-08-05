@@ -1,7 +1,7 @@
 {
   "name": "move-test-gen",
-  "version": "1.3.0",
-  "description": "Coverage checker for Sui Move test suites — assert pairing + mutation testing",
+  "version": "1.4.0",
+  "description": "Coverage checker + security linter for Sui Move — assert pairing, mutation testing, 6 lint rules",
   "type": "module",
   "bin": {
     "move-test-gen": "scripts/check-coverage.mjs"

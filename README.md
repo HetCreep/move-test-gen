@@ -89,12 +89,14 @@ node scripts/check-coverage.mjs ./sources ./tests --lint
 | **MOV-002** | HIGH | `u64 * u64` without `u128` promotion before multiplication |
 | **MOV-003** | MEDIUM | Division by a variable with no prior `assert!(x != 0, ...)` |
 | **MOV-004** | MEDIUM | `(expr as u64)` downcast from u128/u256 without overflow check |
+| **MOV-005** | HIGH | Bool-returning auth call (`vector::contains`, `has`, `is_authorized`) result discarded — authorization runs but is never enforced |
+| **MOV-006** | LOW | Same abort code used in `assert!` across 2+ public functions — callers cannot distinguish which function aborted |
 
 Rules are pure functions in `rules/*.mjs`. The engine skips `#[test_only]` modules and `#[test]` function bodies automatically. MOV-002 and MOV-004 use a lightweight Move parser (`scripts/move-parser.mjs`) to track variable types through declarations, casts, and naming conventions — if an operand is known u128/u256, the finding is suppressed instead of relying on suffix heuristics.
 
-MOV-001 recognizes several Sui Move access control idioms beyond `*Cap`: `Witness<T>`, `Version`, `*Key`, and user-asset parameters (`Coin<T>`, `Balance<T>`, LP tokens) that make a function intentionally permissionless.
+MOV-001 recognizes several Sui Move access control idioms beyond `*Cap`: `Witness<T>`, `Version`, `*Key`, and user-asset parameters (`Coin<T>`, `Balance<T>`, LP tokens) that make a function intentionally permissionless. MOV-005 only flags bool-returning functions (not void functions like `verify()` that abort internally). MOV-006 filters lowercase variable names to avoid flagging parameters used as abort arguments.
 
-Validated against Kriya DEX, Scallop lending (172 files), Bucket Protocol, and Turbos CLMM. Submitted a [fix PR](https://github.com/Bucket-Protocol/v1-core/pull/12) for an overflow found by MOV-002 in Bucket's decimal scaling functions.
+Validated against Kriya DEX, Scallop lending (172 files), Bucket Protocol, Turbos CLMM, SuiTears, and Typus Finance. MOV-005 catches the exact vulnerability that caused the [Typus Finance $3.44M exploit](https://mehvetero.com) (Oct 2025).
 
 Or run lint standalone:
 

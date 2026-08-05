@@ -21,7 +21,7 @@ inputs:
     required: false
     default: ''
   lint:
-    description: 'Run security pattern detection (MOV-001, MOV-002, MOV-003)'
+    description: 'Run security pattern detection (MOV-001 through MOV-006)'
     required: false
     default: 'false'
 runs:

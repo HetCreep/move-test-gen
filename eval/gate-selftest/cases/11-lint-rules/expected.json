@@ -1,5 +1,5 @@
 {
-  "note": "lint rules: MOV-001 (access control), MOV-002 (unchecked mul), MOV-003 (div zero). Synthetic sources, no sui needed.",
+  "note": "lint rules: MOV-001 (access control), MOV-002 (unchecked mul), MOV-003 (div zero), MOV-004 (unsafe downcast), MOV-005 (unused auth result), MOV-006 (shared abort code). Synthetic sources, no sui needed.",
   "type": "script",
   "script": "test.mjs"
 }
