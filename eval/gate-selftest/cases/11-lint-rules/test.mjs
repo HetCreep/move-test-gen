@@ -1,6 +1,6 @@
 /**
  * Selftest for lint rules — synthetic Move source, no sui needed.
- * Tests all 3 rules: MOV-001, MOV-002, MOV-003.
+ * Tests all 6 rules: MOV-001 through MOV-006.
  * Each new skip pattern gets a pin here BEFORE the rule ships.
  */
 import { check as check001 } from '../../../../rules/mov-001-missing-access-control.mjs';
