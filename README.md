@@ -180,6 +180,10 @@ channel assignment — is borrowed, with thanks, from
 - `sui move test --coverage` (fill gaps identified by coverage reports)
 - CI pipelines (generate tests as part of PR review)
 
+## Acknowledgements
+
+Security audit (v1.4.0) by [@HetCreep](https://github.com/HetCreep) — 10 issues + 6 private advisories, zero false positives. The audit caught gate bypasses, CI hardening gaps, and a supply-chain typosquat risk that was filed privately to protect the project.
+
 ## References
 
 See [references/patterns.md](references/patterns.md) for the full catalog of Move-specific edge cases with code templates and rationale.
