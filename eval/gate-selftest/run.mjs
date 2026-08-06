@@ -35,6 +35,7 @@ if (!existsSync(GATE)) {
 const casesDir = join(here, 'cases');
 let pass = 0;
 let fail = 0;
+let skip = 0;
 
 for (const name of readdirSync(casesDir).sort()) {
   const dir = join(casesDir, name);
@@ -48,7 +49,11 @@ for (const name of readdirSync(casesDir).sort()) {
       timeout: 30000,
       cwd: repoRoot,
     });
-    if (r.status === 0) {
+    if (r.status === 2) {
+      skip++;
+      const reason = (r.stdout || '').trim().split('\n').pop() || 'skipped';
+      console.log(`﹣ ${name}  — ${reason}`);
+    } else if (r.status === 0) {
       pass++;
       console.log(`✓ ${name}  — ${exp.note.split('.')[0]}`);
     } else {
@@ -100,7 +105,8 @@ for (const name of readdirSync(casesDir).sort()) {
   }
 }
 
-console.log(`\ngate-selftest: ${pass}/${pass + fail} cases green`);
+const skipNote = skip > 0 ? `, ${skip} skipped` : '';
+console.log(`\ngate-selftest: ${pass}/${pass + fail} cases green${skipNote}`);
 if (fail > 0) {
   console.log('a pinned behavior changed — fix the gate, or consciously update the case and say why in the commit.');
   process.exit(1);

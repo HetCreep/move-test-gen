@@ -27,7 +27,7 @@ function check(label, cond) {
 const suiCheck = spawnSync('sui', ['--version'], { encoding: 'utf8', shell: true, timeout: 10000 });
 if (!suiCheck.stdout || !suiCheck.stdout.includes('sui')) {
   console.log('baseline-zero-tests selftest: SKIPPED (sui CLI not on PATH)');
-  process.exit(0);
+  process.exit(2);
 }
 
 const r = spawnSync(process.execPath, [GATE, sources, tests, '--mutate'], {
