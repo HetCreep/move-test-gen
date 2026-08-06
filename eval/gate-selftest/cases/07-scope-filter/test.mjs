@@ -32,17 +32,17 @@ const out1 = (r1.stdout || '') + (r1.stderr || '');
 const asserts1 = out1.match(/Asserts found:\s+(\d+)/);
 check('no-scope finds 11 asserts', asserts1 && Number(asserts1[1]) === 11);
 
-// Run gate WITH --scope nonexistent.move — should still find 11 asserts in Layer 1
-// (scope only affects mutation, not Layer 1 scanning)
+// Run gate WITH --scope nonexistent.move — pre-scope assert count unchanged,
+// but Layer 1 scoped count shows 0 target asserts
 const r2 = spawnSync(process.execPath, [GATE, join(case01, 'sources'), join(case01, 'tests'), '--scope', 'nonexistent.move'], {
   encoding: 'utf8', timeout: 30000,
 });
 const out2 = (r2.stdout || '') + (r2.stderr || '');
 const asserts2 = out2.match(/Asserts found:\s+(\d+)/);
-check('scope does not affect Layer 1 assert count', asserts2 && Number(asserts2[1]) === 11);
+check('pre-scope assert count unchanged with --scope', asserts2 && Number(asserts2[1]) === 11);
 
-// Verify scope argument is parsed (check it doesn't crash)
-check('scope run exits cleanly', r2.status !== null);
+// Verify exit code is a specific integer, not just "not null"
+check('scope run exits with code 0 or 1', r2.status === 0 || r2.status === 1);
 
 if (errs.length) {
   console.log('FAIL:');
