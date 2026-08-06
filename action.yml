@@ -33,16 +33,16 @@ runs:
         node-version: 20
     - name: Run coverage check
       shell: bash
+      env:
+        MTG_SOURCES: ${{ inputs.sources }}
+        MTG_TESTS: ${{ inputs.tests }}
+        MTG_MUTATE: ${{ inputs.mutate }}
+        MTG_SCOPE: ${{ inputs.scope }}
+        MTG_LINT: ${{ inputs.lint }}
       run: |
         GATE="${GITHUB_ACTION_PATH}/scripts/check-coverage.mjs"
-        ARGS="${{ inputs.sources }} ${{ inputs.tests }}"
-        if [ "${{ inputs.mutate }}" = "true" ]; then
-          ARGS="$ARGS --mutate"
-        fi
-        if [ -n "${{ inputs.scope }}" ]; then
-          ARGS="$ARGS --scope '${{ inputs.scope }}'"
-        fi
-        if [ "${{ inputs.lint }}" = "true" ]; then
-          ARGS="$ARGS --lint"
-        fi
-        node "$GATE" $ARGS
+        args=( "$MTG_SOURCES" "$MTG_TESTS" )
+        [ "$MTG_MUTATE" = "true" ] && args+=( --mutate )
+        [ -n "$MTG_SCOPE" ] && args+=( --scope "$MTG_SCOPE" )
+        [ "$MTG_LINT" = "true" ] && args+=( --lint )
+        node "$GATE" "${args[@]}"
