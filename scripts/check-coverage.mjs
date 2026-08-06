@@ -301,10 +301,11 @@ function runMutations(packageDir, sourceDir, scopeFilter) {
     for (const srcFile of sourceFiles) {
       const original = readFileSync(srcFile, 'utf8');
       const lines = original.split('\n');
+      const strippedLines = stripBlockComments(original).split('\n');
 
       for (const mut of MUTATIONS) {
         for (let i = 0; i < lines.length; i++) {
-          if (!mut.pattern.test(lines[i])) continue;
+          if (!mut.pattern.test(strippedLines[i])) continue;
           if (lines[i].trim().startsWith('//')) continue;
 
           // apply mutation in temp copy
