@@ -39,7 +39,7 @@ const AUTH_PATTERNS = [
 
 const SAFE_CONTEXTS = [
   /assert!\s*\(/,
-  /\blet\s+/,
+  /\blet\s+[a-zA-Z][a-zA-Z0-9]*\s*=/,
   /\bif\s*[\s(]/,
   /\bwhile\s*\(/,
   /\breturn\b/,
@@ -116,11 +116,24 @@ export function check(source, filename) {
       continue;
     }
 
-    // check for standalone auth calls
-    const isAuthCall = AUTH_PATTERNS.some(p => p.test(trimmed));
+    // strip trailing // comment before matching
+    const stripped = trimmed.replace(/\/\/.*$/, '').trim();
+
+    // join multiline statements: if this line has auth pattern but no ;
+    // look ahead to accumulate the full statement
+    let fullStmt = stripped;
+    if (AUTH_PATTERNS.some(p => p.test(stripped)) && !stripped.endsWith(';') && !stripped.endsWith(');')) {
+      for (let j = i + 1; j < lines.length && j < i + 5; j++) {
+        const cont = lines[j].trim().replace(/\/\/.*$/, '').trim();
+        fullStmt += ' ' + cont;
+        if (cont.endsWith(';') || cont.endsWith(');')) break;
+      }
+    }
+
+    const isAuthCall = AUTH_PATTERNS.some(p => p.test(fullStmt));
     if (!isAuthCall) continue;
 
-    const isSafe = SAFE_CONTEXTS.some(p => p.test(trimmed));
+    const isSafe = SAFE_CONTEXTS.some(p => p.test(fullStmt));
     if (isSafe) continue;
 
     // check previous line for multi-line assert!/if
@@ -128,7 +141,7 @@ export function check(source, filename) {
     if (/assert!\s*\(\s*$/.test(prevLine)) continue;
     if (/if\s*\(\s*$/.test(prevLine)) continue;
 
-    if (trimmed.endsWith(';') || trimmed.endsWith(');')) {
+    if (fullStmt.endsWith(';') || fullStmt.endsWith(');')) {
       const callMatch = trimmed.match(/(\w+(?:::\w+)?)\s*\(/);
       const fnName = callMatch ? callMatch[1] : 'call';
 
@@ -137,7 +150,7 @@ export function check(source, filename) {
         severity: SEVERITY,
         file: filename,
         line: i + 1,
-        message: `${TITLE}: \`${fnName}()\` returns bool but result is discarded — wrap in assert!() or bind to a variable`,
+        message: `${TITLE}: \`${fnName}()\` returns bool but result is discarded — wrap in assert!() to enforce the check`,
       });
     }
   }
