@@ -39,7 +39,9 @@ export function check(source, filename) {
     }
 
     const isTestOnly = testOnlyNext;
-    if (testOnlyNext && /\bfun\b/.test(trimmed)) testOnlyNext = false;
+    // clear the flag on ANY item keyword, not just fun — #[test_only] on a use/struct/const
+    // must not carry over to the next function (security advisory #7)
+    if (testOnlyNext && /\b(fun|use|struct|const|entry)\b/.test(trimmed)) testOnlyNext = false;
 
     const fnMatch = trimmed.match(/^public\s+(?:entry\s+)?fun\s+(\w+)(?:<[^>]*>)?\s*\(([^)]*)\)/);
     if (!fnMatch) {
