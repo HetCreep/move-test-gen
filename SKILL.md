@@ -1,11 +1,15 @@
 ---
 name: move-test-gen
 description: >
-  Generates edge-case and adversarial test suites for Sui Move functions. Given a
-  module or function, produces boundary-value tests, arithmetic overflow/underflow
-  tests, access-control violation tests, and state-machine ordering tests. Use
-  after writing or auditing Move code to fill coverage gaps. Pairs well with
-  security audit agents — feed it findings and it produces regression tests.
+  WHEN: after an audit finding, after adding a public/entry function, when sui move
+  coverage summary shows gaps, when a PR touches arithmetic or access control.
+  WHAT: generates edge-case and adversarial Move test suites — boundary values,
+  overflow/underflow, access-control violations, state-machine ordering.
+  Also runs security lint (6 rules: MOV-001 missing capability, MOV-002 unchecked
+  mul, MOV-003 div-by-zero, MOV-004 unsafe downcast, MOV-005 discarded auth check,
+  MOV-006 shared abort code) and mutation testing to verify test strength.
+  Pairs well with security audit agents — feed it findings, it produces regression
+  tests that fail without the fix.
 ---
 
 # Move Test Generator
