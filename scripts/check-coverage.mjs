@@ -256,6 +256,12 @@ function runMutations(packageDir, sourceDir, scopeFilter) {
     baselineMs = Date.now() - start;
     const testCountMatch = baselineOut.match(/Total tests:\s*(\d+)/);
     const testCount = testCountMatch ? Number(testCountMatch[1]) : null;
+    if (testCount === null) {
+      console.log('ERROR: could not read a test count from the baseline run.');
+      console.log('The output did not contain a "Total tests:" line, so there is no way to');
+      console.log('tell an empty suite from a passing one. Refusing to score mutations.\n');
+      return null;
+    }
     if (testCount === 0) {
       console.log('WARNING: baseline ran 0 tests — this is an empty check, not a pass.');
       console.log('Generate tests before running mutation testing.\n');
