@@ -181,6 +181,29 @@ If you do want Layer 2 on pull requests, run it on `pull_request` (not
 `pull_request_target`), keep `permissions: contents: read`, and do not expose
 secrets to that job.
 
+## Suppressing a finding
+
+Three scopes, narrowest first.
+
+```move
+// move-test-gen-disable-next-line MOV-003
+let ratio = total / divisor;          // this line only
+
+// move-test-gen-disable MOV-001, MOV-005
+module demo::legacy { ... }           // rest of the file
+```
+
+```bash
+node scripts/check-coverage.mjs sources tests --lint --disable MOV-003,MOV-006
+```
+
+A comment pragma is used rather than a Move attribute: `#[allow(lint(...))]`
+belongs to the compiler's namespace, so an unknown attribute there risks a
+warning from `sui move build`, while a comment is invisible to it.
+
+Suppressed findings are counted in the summary line, so a reviewer can tell
+that something was silenced rather than never found.
+
 ## Known limitations
 
 The checker is a regex-based parser, not a compiler. It handles the common patterns — including multi-line asserts, module-qualified aborts, and string literals with `//` — but edge cases exist:

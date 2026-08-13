@@ -478,6 +478,8 @@ if (!['critical', 'high', 'medium', 'low', 'none'].includes(String(failOn).toLow
   console.log(`Error: --fail-on must be one of critical|high|medium|low|none (got "${failOn}")`);
   process.exit(EXIT_USAGE);
 }
+const disableIdx = args.indexOf('--disable');
+const disabledRules = disableIdx >= 0 ? String(args[disableIdx + 1] || '').split(',') : [];
 const scopeIdx = args.indexOf('--scope');
 if (scopeIdx >= 0 && !args[scopeIdx + 1]) {
   console.log('Error: --scope needs a comma-separated file list, e.g. --scope fund.move,oracle.move');
@@ -678,8 +680,8 @@ if (unpaired.length === 0) {
 // Security lint (optional)
 if (doLint) {
   const { runLint, printLintResults, shouldFail } = await import('./lint.mjs');
-  const { findings, ruleCount } = await runLint(sourceDir);
-  printLintResults(findings, ruleCount);
+  const { findings, ruleCount, suppressed } = await runLint(sourceDir, { disable: disabledRules });
+  printLintResults(findings, ruleCount, suppressed);
   lintReport = {
     ruleCount,
     findings: findings.map(f => ({
