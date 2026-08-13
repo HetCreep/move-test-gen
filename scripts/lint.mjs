@@ -28,6 +28,32 @@ const RULES_DIR = join(here, '..', 'rules');
  * @param {string} sourcesDir
  * @returns {Promise<{findings: Array, ruleCount: number}>}
  */
+const VALID_SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
+
+/**
+ * A rule that ships without its id or severity is worse than a missing rule:
+ * it runs, produces findings the reporter cannot group, and nothing says so.
+ * Fail at load, naming the file, rather than at some later `undefined`.
+ */
+export function validateRule(mod, file) {
+  const problems = [];
+  if (typeof mod.check !== 'function') problems.push('no exported check() function');
+  const meta = mod.meta;
+  if (!meta || typeof meta !== 'object') {
+    problems.push('no exported meta object');
+  } else {
+    if (!meta.id) problems.push('meta.id is missing');
+    if (!meta.title) problems.push('meta.title is missing');
+    if (!meta.severity) problems.push('meta.severity is missing');
+    else if (!VALID_SEVERITIES.includes(String(meta.severity).toUpperCase())) {
+      problems.push(`meta.severity "${meta.severity}" is not one of ${VALID_SEVERITIES.join(', ')}`);
+    }
+  }
+  if (problems.length) {
+    throw new Error(`rules/${file} is not a valid rule: ${problems.join('; ')}`);
+  }
+}
+
 export async function runLint(sourcesDir) {
   // load rules
   const ruleFiles = readdirSync(RULES_DIR)
@@ -37,6 +63,7 @@ export async function runLint(sourcesDir) {
   const rules = [];
   for (const rf of ruleFiles) {
     const mod = await import(pathToFileURL(join(RULES_DIR, rf)).href);
+    validateRule(mod, rf);
     rules.push({ check: mod.check, meta: mod.meta, file: rf });
   }
 
