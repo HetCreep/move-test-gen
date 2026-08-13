@@ -242,6 +242,10 @@ const MUTATIONS = [
   },
 ];
 
+// A killed test and a timed-out test are not the same evidence. execSync sets
+// e.signal to SIGTERM (or e.code to ETIMEDOUT) when its timeout fires.
+const isTimeout = (e) => Boolean(e && (e.signal === 'SIGTERM' || e.code === 'ETIMEDOUT'));
+
 function runMutations(packageDir, sourceDir, scopeFilter) {
   // baseline: run tests on unmodified code first
   console.log('Running baseline test (unmodified code)...');
@@ -327,24 +331,36 @@ function runMutations(packageDir, sourceDir, scopeFilter) {
 
           // check if mutant compiles first
           let compiles = true;
+          let buildTimedOut = false;
           try {
             execSync('sui move build 2>&1', {
               cwd: tempDir,
               timeout: mutantTimeout,
               stdio: 'pipe',
             });
-          } catch {
+          } catch (e) {
             compiles = false;
+            buildTimedOut = isTimeout(e);
           }
 
           if (!compiles) {
-            // stillborn mutant — doesn't compile, skip
+            // A build that TIMED OUT is not a stillborn mutant: it may be
+            // perfectly valid and simply slow. Dropping it silently shrinks the
+            // denominator and inflates the score.
+            if (buildTimedOut) {
+              results.push({
+                file: relative(tempDir, srcFile), line: i + 1,
+                mutation: mut.name, desc: mut.desc,
+                original: lines[i].trim(), killed: false, timedOut: true,
+              });
+            }
             writeFileSync(srcFile, original);
             continue;
           }
 
           // run tests against compiled mutant
           let killed = false;
+          let timedOut = false;
           try {
             execSync('sui move test 2>&1', {
               cwd: tempDir,
@@ -353,9 +369,11 @@ function runMutations(packageDir, sourceDir, scopeFilter) {
             });
             // tests passed = mutation survived = weak test
             killed = false;
-          } catch {
-            // tests failed = mutation killed = good
-            killed = true;
+          } catch (e) {
+            // A timeout is not a kill. Counting it as one lets budget pressure
+            // quietly raise the mutation score.
+            timedOut = isTimeout(e);
+            killed = !timedOut;
           }
 
           results.push({
@@ -365,6 +383,7 @@ function runMutations(packageDir, sourceDir, scopeFilter) {
             desc: mut.desc,
             original: lines[i].trim(),
             killed,
+            timedOut,
           });
 
           // restore for next mutation
@@ -381,7 +400,7 @@ function runMutations(packageDir, sourceDir, scopeFilter) {
 
 // ── joint mutant probe ──────────────────────────────────────────────
 
-function runJointMutant(packageDir, sourceDir, candidate) {
+function runJointMutant(packageDir, sourceDir, candidate, probeTimeout = 60000) {
   const tempDir = mkdtempSync(join(tmpdir(), 'mtg-probe-'));
   cpSync(packageDir, tempDir, { recursive: true });
 
@@ -400,13 +419,13 @@ function runJointMutant(packageDir, sourceDir, candidate) {
     writeFileSync(srcFile, lines.join('\n'));
 
     try {
-      execSync('sui move build 2>&1', { cwd: tempDir, timeout: 60000, stdio: 'pipe' });
+      execSync('sui move build 2>&1', { cwd: tempDir, timeout: probeTimeout, stdio: 'pipe' });
     } catch {
       return null;
     }
 
     try {
-      execSync('sui move test 2>&1', { cwd: tempDir, timeout: 60000, stdio: 'pipe' });
+      execSync('sui move test 2>&1', { cwd: tempDir, timeout: probeTimeout, stdio: 'pipe' });
       return false;
     } catch {
       return true;
@@ -570,18 +589,24 @@ if (doMutate) {
   } else if (mutResults.length === 0) {
     console.log('No applicable mutations found in source files.\n');
   } else {
-    const killed = mutResults.filter(r => r.killed);
-    const survived = mutResults.filter(r => !r.killed);
+    const timedOut = mutResults.filter(r => r.timedOut);
+    const decided = mutResults.filter(r => !r.timedOut);
+    const killed = decided.filter(r => r.killed);
+    const survived = decided.filter(r => !r.killed);
 
     console.log(`Mutations: ${mutResults.length} applied (stillborn excluded)`);
     console.log(`Killed:    ${killed.length} (tests caught the bug ✓)`);
     console.log(`Survived:  ${survived.length} (tests missed the bug ✗)`);
+    if (timedOut.length > 0) {
+      console.log(`Timed out: ${timedOut.length} (no verdict — excluded from the score)`);
+      for (const t of timedOut) console.log(`  ⏱ ${t.file}:${t.line} [${t.mutation}]`);
+    }
 
     if (survived.length > 0) {
       const { candidates } = identifyProbeCandidates(mutResults, allAsserts);
 
       const probeOutcomes = candidates.map(c => {
-        const probed = runJointMutant(packageDir, sourceDir, c);
+        const probed = runJointMutant(packageDir, sourceDir, c, mutantTimeout);
         return { ...c, jointKilled: probed };
       });
 
@@ -596,8 +621,12 @@ if (doMutate) {
       }
     }
 
-    const score = Math.round((killed.length / mutResults.length) * 100);
-    console.log(`\nMutation score: ${score}%`);
+    const score = decided.length > 0
+      ? Math.round((killed.length / decided.length) * 100)
+      : null;
+    console.log(score === null
+      ? '\nMutation score: n/a (every mutant timed out)'
+      : `\nMutation score: ${score}%`);
     mutationReport = {
       applied: mutResults.length,
       killed: killed.length,
