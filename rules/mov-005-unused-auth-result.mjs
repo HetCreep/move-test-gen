@@ -39,7 +39,7 @@ const AUTH_PATTERNS = [
 
 const SAFE_CONTEXTS = [
   /assert!\s*\(/,
-  /\blet\s+[a-zA-Z][a-zA-Z0-9]*\s*=/,
+  /\blet\s+[a-zA-Z]\w*\s*=/,
   /\bif\s*[\s(]/,
   /\bwhile\s*\(/,
   /\breturn\b/,
