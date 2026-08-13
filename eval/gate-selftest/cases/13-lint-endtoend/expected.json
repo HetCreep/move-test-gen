@@ -1,0 +1,5 @@
+{
+  "note": "lint through the real CLI: rule discovery, the six-rule count, and the severity-to-exit mapping",
+  "type": "script",
+  "script": "test.mjs"
+}
