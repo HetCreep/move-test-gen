@@ -5,14 +5,53 @@ Notable changes per released tag. Dates are the tag's commit date.
 Generated from `git log` between tags — if an entry looks wrong, the commit
 history is the source of truth.
 
-## Unreleased
+## v1.5.0 — 2026-08-13
 
-Commits on `main` after `v1.4.1`. **These are in no published tag**, so a
-consumer pinning `@v1.4.1` does not have them:
+Major community release. 23 pull requests merged from [@HetCreep](https://github.com/HetCreep), 3 security advisories patched, and the first external contributor joined the project.
 
-- 42249b7 fix: mutation engine skips block-commented lines (lead #1 from HetCreep unchecked-scope)
-- ceb4693 fix: MOV-001 #[test_only] on use/struct/const no longer exempts the next function (advisory #7)
-- be0fd83 skill: lead description with WHEN triggers, not just WHAT it does
+### Security fixes
+- GHSA-6r4g: block comment containing `#[test_only]` above module skipped all 6 lint rules
+- GHSA-w7pc: zero parsed asserts printed "100% coverage" and exited 0
+- GHSA-5499: same-line `#[test_only] use ...` leaked exemption onto the next function (MOV-001, MOV-003)
+- `stripBlockComments` extracted to shared module (`scripts/strip-comments.mjs`)
+
+### New features
+- `--fail-on <severity>` flag — configurable gate threshold (default: high)
+- `--json` machine-readable output with versioned schema
+- `// move-test-gen-disable-next-line MOV-003` suppression pragmas + `--disable` flag
+- Exit codes: 0 clean / 1 findings / 2 usage error / 3 tool error
+- Action outputs: `coverage-percent`, `mutation-score`, `lint-findings` + job summary
+- Action boolean inputs accept `yes`/`true`/`on`/`1` (case-insensitive)
+- Rule metadata validated at load — missing id/severity fails immediately
+
+### Compatibility
+- `public(package)` visibility (Move 2024 edition) recognized by parser, MOV-001, MOV-006
+- `--scope` separator normalized for Windows paths
+- `--scope` with no match is now an error, not a silent pass
+
+### Reliability
+- Mutation timeout is its own outcome (not counted as killed)
+- `runJointMutant` timeout scales from baseline instead of hard-coded 60s
+- Missing test count is an error, not a pass
+- Lint self-test capable of actually failing
+- Lint path exercised end-to-end through the CLI
+- MOV-001 exemption list pinned in selftest
+- Temp-dir cleanup registered before the recursive copy
+- `persist-credentials: false` on all non-pushing checkout steps
+- `timeout-minutes` and `concurrency` group on both workflows
+- SHA-pinned `actions/setup-node` in the composite action
+
+### Documentation
+- `SECURITY.md` — vulnerability reporting channel
+- `CHANGELOG.md` — this file
+- `RELEASE.md` — release checklist
+- README: manual-install tree corrected, exit-code section, untrusted-code warning, skills-path versioning note, consumer workflow examples hardened
+- dependabot for `github-actions` ecosystem
+
+### Packaging
+- `package.json`: `files` allowlist (246 entries → essential files only), `engines` field
+- npm `move-test-gen@0.0.2` republished (leading-space shebang fixed)
+- Dead import removed from `walk-dir.mjs`
 
 ## v1.4.1 — 2026-08-06
 
