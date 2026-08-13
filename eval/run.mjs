@@ -103,21 +103,32 @@ function runGate(scenarioDir, { mutate, scope }) {
     join(relative(repoRoot, scenarioDir), 'tests')];
   if (mutate) args.push('--mutate');
   if (scope) { args.push('--scope'); args.push(scope); }
+  args.push('--json', '-');
   const r = spawnSync(process.execPath, args, {
     cwd: repoRoot, encoding: 'utf8', timeout: 30 * 60 * 1000,
   });
   const out = (r.stdout || '') + (r.stderr || '');
 
-  const num = (re) => { const m = out.match(re); return m ? Number(m[1]) : null; };
+  // Numbers come from the gate's --json report. The findings STRINGS below are
+  // still derived from stdout on purpose: they are the keys the dry-round
+  // protocol compares against every round recorded in eval/results/*/rounds.json,
+  // and changing how they are built would make new rounds incomparable with the
+  // 46 already on record. Moving them is a separate, deliberate change.
+  let report = null;
+  const jsonStart = out.lastIndexOf('\n{\n');
+  if (jsonStart >= 0) {
+    try { report = JSON.parse(out.slice(jsonStart)); } catch { report = null; }
+  }
+  const mut = report && report.mutation;
   const parsed = {
     exit: r.status,
-    asserts: num(/Asserts found:\s+(\d+)/),
-    covered: (out.match(/Covered:\s+(\d+\/\d+)/) || [])[1] || null,
-    mutations: num(/Mutations:\s+(\d+)/),
-    killed: num(/Killed:\s+(\d+)/),
-    survived: num(/Survived:\s+(\d+)/),
-    score: num(/Mutation score[^:]*:\s+(\d+)%/),
-    mutateSkipped: /could not run/.test(out),
+    asserts: report ? report.coverage.total : null,
+    covered: report ? `${report.coverage.covered}/${report.coverage.total}` : null,
+    mutations: mut && !mut.skipped ? mut.applied : null,
+    killed: mut && !mut.skipped ? mut.killed : null,
+    survived: mut && !mut.skipped ? mut.survived : null,
+    score: mut && !mut.skipped ? mut.score : null,
+    mutateSkipped: Boolean(mut && mut.skipped),
     findings: [],
   };
 

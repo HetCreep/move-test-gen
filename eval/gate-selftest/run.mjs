@@ -64,20 +64,24 @@ for (const name of readdirSync(casesDir).sort()) {
     continue;
   }
 
-  const r = spawnSync(process.execPath, [GATE, join(dir, 'sources'), join(dir, 'tests')], {
+  const r = spawnSync(process.execPath, [GATE, join(dir, 'sources'), join(dir, 'tests'), '--json', '-'], {
     encoding: 'utf8',
     timeout: 30000,
   });
   const out = (r.stdout || '') + (r.stderr || '');
   const errs = [];
 
-  const grab = (re) => {
-    const m = out.match(re);
-    return m ? m[1] : null;
-  };
+  // The gate emits its JSON report last, so the final {...} block is it.
+  // stdout_contains / stdout_absent still assert against the human output.
+  let report = null;
+  const jsonStart = out.lastIndexOf('\n{\n');
+  if (jsonStart >= 0) {
+    try { report = JSON.parse(out.slice(jsonStart)); } catch { report = null; }
+  }
+  if (!report) errs.push('gate emitted no parseable --json report');
 
-  const asserts = Number(grab(/Asserts found:\s+(\d+)/));
-  const covered = grab(/Covered:\s+(\d+\/\d+)/);
+  const asserts = report ? report.coverage.total : null;
+  const covered = report ? `${report.coverage.covered}/${report.coverage.total}` : null;
 
   if (exp.asserts !== undefined && asserts !== exp.asserts) {
     errs.push(`asserts found: ${asserts}, expected ${exp.asserts}`);
