@@ -421,7 +421,7 @@ const doLint = args.includes('--lint');
 const scopeIdx = args.indexOf('--scope');
 if (scopeIdx >= 0 && !args[scopeIdx + 1]) {
   console.log('Error: --scope needs a comma-separated file list, e.g. --scope fund.move,oracle.move');
-  process.exit(1);
+  process.exit(2);
 }
 const scopeFiles = scopeIdx >= 0
   ? args[scopeIdx + 1].split(',').map(f => f.trim()).filter(Boolean)
@@ -470,7 +470,7 @@ if (scopeFiles) {
   if (targetAsserts.length === 0 && allAsserts.length > 0) {
     console.log(`Error: --scope matched no source file (scope: ${scopeFiles.join(', ')})`);
     console.log(`       ${allAsserts.length} assert site(s) were found, every one of them outside the scope list.`);
-    process.exit(1);
+    process.exit(2);
   }
   if (targetAsserts.length !== allAsserts.length) {
     const excluded = [...new Set(allAsserts.filter(a => !inScope(a)).map(a => a.file))];
