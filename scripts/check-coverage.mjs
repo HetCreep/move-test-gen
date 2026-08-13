@@ -286,7 +286,30 @@ function runMutations(packageDir, sourceDir, scopeFilter) {
   const mutantTimeout = Math.max(30000, baselineMs * 3);
 
   // work on a temp copy to protect user's source
-  const tempDir = mkdtempSync(join(tmpdir(), 'mtg-mutate-'));
+  let tempDir = null;
+
+  const cleanup = () => {
+    if (!tempDir) return;
+    try { rmSync(tempDir, { recursive: true, force: true }); } catch {}
+  };
+
+  // handle SIGINT/SIGTERM gracefully (CI sends SIGTERM on timeout).
+  //
+  // Registered BEFORE the directory is created and copied into. The recursive
+  // copy below is the slowest step in this function, so a SIGTERM landing
+  // during it is exactly the CI-timeout case these handlers exist for - and it
+  // was previously outside their window, leaving a full copy of the package
+  // behind with nothing registered to remove it. cleanup() no-ops while
+  // tempDir is still null.
+  const onSignal = (sig) => {
+    console.log(`\n${sig} — cleaning up temp directory...`);
+    cleanup();
+    process.exit(sig === 'SIGINT' ? 130 : 143);
+  };
+  process.on('SIGINT', () => onSignal('SIGINT'));
+  process.on('SIGTERM', () => onSignal('SIGTERM'));
+
+  tempDir = mkdtempSync(join(tmpdir(), 'mtg-mutate-'));
   cpSync(packageDir, tempDir, { recursive: true });
   const tempSourceDir = join(tempDir, relative(packageDir, sourceDir));
 
@@ -296,19 +319,6 @@ function runMutations(packageDir, sourceDir, scopeFilter) {
     console.log(`Scope: mutating ${sourceFiles.length} file(s) (${scopeFilter.join(', ')})\n`);
   }
   const results = [];
-
-  const cleanup = () => {
-    try { rmSync(tempDir, { recursive: true, force: true }); } catch {}
-  };
-
-  // handle SIGINT/SIGTERM gracefully (CI sends SIGTERM on timeout)
-  const onSignal = (sig) => {
-    console.log(`\n${sig} — cleaning up temp directory...`);
-    cleanup();
-    process.exit(sig === 'SIGINT' ? 130 : 143);
-  };
-  process.on('SIGINT', () => onSignal('SIGINT'));
-  process.on('SIGTERM', () => onSignal('SIGTERM'));
 
   try {
     for (const srcFile of sourceFiles) {
