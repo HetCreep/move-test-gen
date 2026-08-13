@@ -310,7 +310,10 @@ function runMutations(packageDir, sourceDir, scopeFilter) {
 
           // apply mutation in temp copy
           const mutated = [...lines];
-          mutated[i] = mutated[i].replace(mut.pattern, mut.replace);
+          // mutate the comment-stripped line: applicability was decided on it
+          // above, and replacing on the raw line can land the edit inside a
+          // /* ... */ comment that happens to precede the code on that line.
+          mutated[i] = strippedLines[i].replace(mut.pattern, mut.replace);
           writeFileSync(srcFile, mutated.join('\n'));
 
           // check if mutant compiles first
