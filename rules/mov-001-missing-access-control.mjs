@@ -43,9 +43,9 @@ export function check(source, filename) {
     // must not carry over to the next function (security advisory #7)
     if (testOnlyNext && /\b(fun|use|struct|const|entry)\b/.test(trimmed)) testOnlyNext = false;
 
-    const fnMatch = trimmed.match(/^public\s+(?:entry\s+)?fun\s+(\w+)(?:<[^>]*>)?\s*\(([^)]*)\)/);
+    const fnMatch = trimmed.match(/^public(?:\s*\((?:package|friend)\))?\s+(?:entry\s+)?fun\s+(\w+)(?:<[^>]*>)?\s*\(([^)]*)\)/);
     if (!fnMatch) {
-      const startMatch = trimmed.match(/^public\s+(?:entry\s+)?fun\s+(\w+)(?:<[^>]*>)?\s*\(/);
+      const startMatch = trimmed.match(/^public(?:\s*\((?:package|friend)\))?\s+(?:entry\s+)?fun\s+(\w+)(?:<[^>]*>)?\s*\(/);
       if (startMatch) {
         let params = '';
         for (let j = i; j < Math.min(i + 10, lines.length); j++) {
