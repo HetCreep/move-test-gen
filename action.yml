@@ -63,10 +63,22 @@ runs:
         MTG_FAIL_ON: ${{ inputs.fail-on }}
       run: |
         GATE="${GITHUB_ACTION_PATH}/scripts/check-coverage.mjs"
+
+        # Accept the spellings a human actually writes. An unrecognised value is
+        # an error rather than a silent "false": the failure mode of the old
+        # `= "true"` test was a green Layer-1-only run that looked complete.
+        is_true() {
+          case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+            true|yes|y|on|1) return 0 ;;
+            false|no|n|off|0|'') return 1 ;;
+            *) echo "move-test-gen: unrecognised boolean value '$1' for $2" >&2; exit 2 ;;
+          esac
+        }
+
         args=( "$MTG_SOURCES" "$MTG_TESTS" )
-        [ "$MTG_MUTATE" = "true" ] && args+=( --mutate )
+        is_true "$MTG_MUTATE" mutate && args+=( --mutate )
         [ -n "$MTG_SCOPE" ] && args+=( --scope "$MTG_SCOPE" )
-        [ "$MTG_LINT" = "true" ] && args+=( --lint )
+        is_true "$MTG_LINT" lint && args+=( --lint )
         [ -n "$MTG_FAIL_ON" ] && args+=( --fail-on "$MTG_FAIL_ON" )
         args+=( --json "${RUNNER_TEMP:-/tmp}/move-test-gen.json" )
         set +e
