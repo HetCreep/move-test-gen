@@ -124,6 +124,19 @@ export function printLintResults(findings, ruleCount) {
   console.log(`\n${findings.length} finding(s): ${summary}`);
 }
 
+// Severity ordering, shared by the standalone CLI and the gate so the two can
+// never disagree about what fails a build.
+export const SEVERITY_ORDER = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+/** Do these findings warrant a non-zero exit at the given threshold? */
+export function shouldFail(findings, threshold = 'high') {
+  const t = String(threshold).toUpperCase();
+  if (t === 'NONE') return false;
+  const floor = SEVERITY_ORDER.indexOf(t);
+  if (floor < 0) return findings.some(f => f.severity === 'CRITICAL' || f.severity === 'HIGH');
+  return findings.some(f => SEVERITY_ORDER.indexOf(f.severity) >= floor);
+}
+
 // standalone mode
 if (process.argv[1] && process.argv[1].endsWith('lint.mjs')) {
   const dir = process.argv[2];
@@ -133,7 +146,9 @@ if (process.argv[1] && process.argv[1].endsWith('lint.mjs')) {
   }
   const { findings, ruleCount } = await runLint(dir);
   printLintResults(findings, ruleCount);
-  if (findings.some(f => f.severity === 'CRITICAL' || f.severity === 'HIGH')) {
+  const failIdx = process.argv.indexOf('--fail-on');
+  const threshold = failIdx >= 0 ? process.argv[failIdx + 1] : 'high';
+  if (shouldFail(findings, threshold)) {
     process.exit(1);
   }
 }

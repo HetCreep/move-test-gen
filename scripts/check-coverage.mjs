@@ -443,6 +443,12 @@ if (args.length < 2) {
 const [sourceDir, testDir] = args.map(a => resolve(a));
 const doMutate = args.includes('--mutate');
 const doLint = args.includes('--lint');
+const failOnIdx = args.indexOf('--fail-on');
+const failOn = failOnIdx >= 0 ? args[failOnIdx + 1] : 'high';
+if (!['critical', 'high', 'medium', 'low', 'none'].includes(String(failOn).toLowerCase())) {
+  console.log(`Error: --fail-on must be one of critical|high|medium|low|none (got "${failOn}")`);
+  process.exit(EXIT_USAGE);
+}
 const scopeIdx = args.indexOf('--scope');
 if (scopeIdx >= 0 && !args[scopeIdx + 1]) {
   console.log('Error: --scope needs a comma-separated file list, e.g. --scope fund.move,oracle.move');
@@ -632,7 +638,7 @@ if (unpaired.length === 0) {
 
 // Security lint (optional)
 if (doLint) {
-  const { runLint, printLintResults } = await import('./lint.mjs');
+  const { runLint, printLintResults, shouldFail } = await import('./lint.mjs');
   const { findings, ruleCount } = await runLint(sourceDir);
   printLintResults(findings, ruleCount);
   lintReport = {
@@ -641,7 +647,7 @@ if (doLint) {
       file: f.file, line: f.line, rule: f.rule, severity: f.severity, message: f.message,
     })),
   };
-  if (findings.some(f => f.severity === 'CRITICAL' || f.severity === 'HIGH')) {
+  if (shouldFail(findings, failOn)) {
     gateFailed = true;
   }
 }
