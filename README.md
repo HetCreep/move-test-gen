@@ -37,10 +37,22 @@ skills/
 └── move-test-gen/
     ├── SKILL.md
     ├── scripts/
-    │   └── check-coverage.mjs
+    │   ├── check-coverage.mjs
+    │   ├── classify.mjs
+    │   ├── lint.mjs
+    │   ├── move-parser.mjs
+    │   ├── scope-filter.mjs
+    │   ├── testability.mjs
+    │   └── walk-dir.mjs
+    ├── rules/
+    │   └── mov-00*.mjs          (all six, needed for --lint)
     └── references/
         └── patterns.md
 ```
+
+The simplest correct instruction is to copy `scripts/`, `rules/` and
+`references/` wholesale — `check-coverage.mjs` imports four sibling modules and
+`lint.mjs` loads every `rules/mov-*.mjs` at run time.
 
 Then ask Claude Code:
 
