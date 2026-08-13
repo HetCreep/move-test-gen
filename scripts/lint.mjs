@@ -102,7 +102,7 @@ if (process.argv[1] && process.argv[1].endsWith('lint.mjs')) {
   const dir = process.argv[2];
   if (!dir) {
     console.log('Usage: node scripts/lint.mjs <sources-dir>');
-    process.exit(1);
+    process.exit(2);
   }
   const { findings, ruleCount } = await runLint(dir);
   printLintResults(findings, ruleCount);

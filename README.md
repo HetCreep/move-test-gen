@@ -136,6 +136,22 @@ The skill aims for:
 | State-transition | 4 |
 | Economic (fees/rates) | 6 |
 
+## Exit codes
+
+| code | meaning |
+|---|---|
+| `0` | clean |
+| `1` | the gate failed — unpaired asserts, surviving mutants, or a lint finding at or above the threshold |
+| `2` | usage error, or a sources/tests directory that cannot be read |
+| `3` | the tool could not run and produced no verdict (for example `--mutate` was requested but the `sui` CLI is missing) |
+
+`130` and `143` are the usual SIGINT / SIGTERM codes.
+
+A defect outranks a missing tool: if Layer 1 found something, the run exits `1`
+even when `--mutate` could not run. Exit `3` means no verdict was reached, which
+is a different thing from a verdict of "failed" and should usually be read as a
+broken CI configuration rather than a broken pull request.
+
 ## Known limitations
 
 The checker is a regex-based parser, not a compiler. It handles the common patterns — including multi-line asserts, module-qualified aborts, and string literals with `//` — but edge cases exist:

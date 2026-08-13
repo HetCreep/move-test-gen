@@ -418,6 +418,17 @@ function runJointMutant(packageDir, sourceDir, candidate) {
 
 // ── main ─────────────────────────────────────────────────────────────
 
+// exit-code contract (documented in README):
+//   0  clean
+//   1  the gate failed - unpaired asserts, surviving mutants, or a lint
+//      finding at or above the fail-on threshold
+//   2  usage error or unreadable input
+//   3  the tool could not run and produced no verdict
+const EXIT_OK = 0;
+const EXIT_GATE_FAILED = 1;
+const EXIT_USAGE = 2;
+const EXIT_CANNOT_RUN = 3;
+
 const args = process.argv.slice(2);
 if (args.length < 2) {
   console.log('Usage: node check-coverage.mjs <sources-dir> <tests-dir> [options]');
@@ -426,7 +437,7 @@ if (args.length < 2) {
   console.log('  --lint                       run the security lint rules');
   console.log('  --testability                run the testability pre-flight');
   console.log('  --scope a.move,b.move        only score these source files');
-  process.exit(1);
+  process.exit(EXIT_USAGE);
 }
 
 const [sourceDir, testDir] = args.map(a => resolve(a));
@@ -442,6 +453,7 @@ const scopeFiles = scopeIdx >= 0
   : null;
 let mutationWeak = false;
 let mutationSkipped = false;
+let gateFailed = false;
 
 console.log('=== move-test-gen coverage checker ===\n');
 
@@ -452,7 +464,7 @@ try {
   testFiles = walkDir(testDir, '.move');
 } catch (e) {
   console.error(`Error: cannot read directory — ${e.message}`);
-  process.exit(1);
+  process.exit(EXIT_USAGE);
 }
 
 const allAsserts = sourceFiles.flatMap(extractAsserts);
@@ -545,7 +557,6 @@ if (doMutate) {
   if (mutResults === null) {
     console.log('Mutation testing skipped (see errors above).\n');
     mutationSkipped = true;
-    process.exitCode = 1;
   } else if (mutResults.length === 0) {
     console.log('No applicable mutations found in source files.\n');
   } else {
@@ -580,7 +591,7 @@ if (doMutate) {
 
     if (survived.length > 0) {
       mutationWeak = true;
-      process.exitCode = 1;
+      gateFailed = true;
     }
   }
 }
@@ -593,7 +604,7 @@ const coverageScore = targetAsserts.length > 0
 console.log(`Assert coverage: ${coverageScore}% (${covered.length}/${targetAsserts.length})`);
 if (unpaired.length > 0) {
   console.log(`⚠ ${unpaired.length} assert(s) have no expected_failure test`);
-  process.exitCode = 1;
+  gateFailed = true;
 }
 if (unpaired.length === 0) {
   if (mutationSkipped) {
@@ -611,7 +622,7 @@ if (doLint) {
   const { findings, ruleCount } = await runLint(sourceDir);
   printLintResults(findings, ruleCount);
   if (findings.some(f => f.severity === 'CRITICAL' || f.severity === 'HIGH')) {
-    process.exitCode = 1;
+    gateFailed = true;
   }
 }
 
@@ -636,4 +647,16 @@ if (doLint || args.includes('--testability')) {
       console.log(`  ${icon} ${w.level.toUpperCase()}  ${w.message}`);
     }
   }
+}
+
+// ── exit ─────────────────────────────────────────────────────────────
+// A real defect outranks a missing tool: if Layer 1 found something, that is a
+// verdict and it is 1. Exit 3 is reserved for a run that produced no verdict at
+// all, which is why "--mutate could not run" no longer looks like "found a bug".
+if (gateFailed) {
+  process.exitCode = EXIT_GATE_FAILED;
+} else if (mutationSkipped) {
+  process.exitCode = EXIT_CANNOT_RUN;
+} else {
+  process.exitCode = EXIT_OK;
 }
