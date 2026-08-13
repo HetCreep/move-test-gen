@@ -87,7 +87,17 @@ function extractAsserts(filePath) {
     // detect assert! start — may span multiple lines
     if (/assert!\s*\(/.test(code)) {
       const full = joinMultiline(lines, i);
-      const assertMatch = full.match(/assert!\s*\(.*,\s*(\w+)\s*\)/);
+      // tolerate a trailing comma and a parenthesised code - both valid Move,
+      // both previously dropped on the floor
+      const assertMatch = full.match(/assert!\s*\(.*,\s*\(?\s*(\w+)\s*\)?\s*,?\s*\)/);
+      if (!assertMatch) {
+        // An assert! we can SEE but cannot READ is not an absent assert.
+        // Discarding it removed it from both sides of the ratio, so a file of
+        // unreadable asserts scored 100%.
+        asserts.push({
+          file: filePath, line: i + 1, code: null, text: line, type: 'unparsed',
+        });
+      }
       if (assertMatch) {
         asserts.push({
           file: filePath,
@@ -634,10 +644,30 @@ if (doMutate) {
 
 // summary
 console.log('\n--- Summary ---');
+const unparsedAsserts = targetAsserts.filter(a => a.type === 'unparsed');
+if (unparsedAsserts.length > 0) {
+  console.log(`\n⚠ ${unparsedAsserts.length} assert(s) could not be parsed and are NOT scored:`);
+  for (const a of unparsedAsserts) console.log(`  ? ${a.file}:${a.line}  ${a.text.trim()}`);
+  gateFailed = true;
+}
+
+// A sources path holding no .move files at all is a misconfiguration, not a
+// clean result - it is how a repo that reorganises its layout ends up with a
+// permanently green gate. A real package that genuinely contains no asserts
+// is a different thing and is reported, not failed.
+if (sourceFiles.length === 0) {
+  console.log(`\n⚠ no .move files were found under ${sourceDir}`);
+  console.log('  Nothing was analysed. This is reported as a failure rather than');
+  console.log('  as full coverage, because it is usually a wrong path.');
+  gateFailed = true;
+}
+
 const coverageScore = targetAsserts.length > 0
   ? Math.round((covered.length / targetAsserts.length) * 100)
   : 100;
-console.log(`Assert coverage: ${coverageScore}% (${covered.length}/${targetAsserts.length})`);
+console.log(targetAsserts.length === 0
+  ? 'Assert coverage: n/a (no assert sites found — nothing to measure)'
+  : `Assert coverage: ${coverageScore}% (${covered.length}/${targetAsserts.length})`);
 if (unpaired.length > 0) {
   console.log(`⚠ ${unpaired.length} assert(s) have no expected_failure test`);
   gateFailed = true;
@@ -648,7 +678,9 @@ if (unpaired.length === 0) {
   } else if (mutationWeak) {
     console.log('✓ All asserts paired, but mutation testing found weaknesses (see above)');
   } else {
-    console.log('✓ All asserts have matching expected_failure tests');
+    console.log(targetAsserts.length === 0
+      ? 'No assert sites to check.'
+      : '✓ All asserts have matching expected_failure tests');
   }
 }
 
