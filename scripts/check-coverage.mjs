@@ -451,8 +451,12 @@ if (scopeIdx >= 0 && !args[scopeIdx + 1]) {
 const scopeFiles = scopeIdx >= 0
   ? args[scopeIdx + 1].split(',').map(f => f.trim()).filter(Boolean)
   : null;
+const jsonIdx = args.indexOf('--json');
+const jsonPath = jsonIdx >= 0 ? (args[jsonIdx + 1] || '-') : null;
 let mutationWeak = false;
 let mutationSkipped = false;
+let mutationReport = null;
+let lintReport = null;
 let gateFailed = false;
 
 console.log('=== move-test-gen coverage checker ===\n');
@@ -588,6 +592,16 @@ if (doMutate) {
 
     const score = Math.round((killed.length / mutResults.length) * 100);
     console.log(`\nMutation score: ${score}%`);
+    mutationReport = {
+      applied: mutResults.length,
+      killed: killed.length,
+      survived: survived.length,
+      score,
+      skipped: false,
+      survivors: survived.map(r => ({
+        file: r.file, line: r.line, mutation: r.mutation, original: r.original,
+      })),
+    };
 
     if (survived.length > 0) {
       mutationWeak = true;
@@ -621,6 +635,12 @@ if (doLint) {
   const { runLint, printLintResults } = await import('./lint.mjs');
   const { findings, ruleCount } = await runLint(sourceDir);
   printLintResults(findings, ruleCount);
+  lintReport = {
+    ruleCount,
+    findings: findings.map(f => ({
+      file: f.file, line: f.line, rule: f.rule, severity: f.severity, message: f.message,
+    })),
+  };
   if (findings.some(f => f.severity === 'CRITICAL' || f.severity === 'HIGH')) {
     gateFailed = true;
   }
@@ -659,4 +679,35 @@ if (gateFailed) {
   process.exitCode = EXIT_CANNOT_RUN;
 } else {
   process.exitCode = EXIT_OK;
+}
+
+// ── machine-readable report ──────────────────────────────────────────
+if (jsonPath) {
+  const report = {
+    schemaVersion: 1,
+    tool: 'move-test-gen',
+    sources: sourceDir,
+    tests: testDir,
+    coverage: {
+      covered: covered.length,
+      total: targetAsserts.length,
+      percent: coverageScore,
+      unpaired: unpaired.map(a => ({
+        file: a.file, line: a.line, code: a.code, type: a.type,
+      })),
+    },
+    mutation: doMutate
+      ? (mutationReport || { applied: 0, killed: 0, survived: 0, score: null,
+                             skipped: mutationSkipped, survivors: [] })
+      : null,
+    lint: lintReport,
+    exit: process.exitCode || 0,
+  };
+  const text = JSON.stringify(report, null, 2);
+  if (jsonPath === '-') {
+    console.log(text);
+  } else {
+    writeFileSync(jsonPath, text + '\n');
+    console.log(`\nJSON report written to ${jsonPath}`);
+  }
 }
