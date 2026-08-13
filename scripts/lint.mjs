@@ -54,7 +54,13 @@ export async function runLint(sourcesDir) {
     if (/^\s*#\[test_only\]/m.test(prefix)) continue;
 
     for (const rule of rules) {
-      const findings = rule.check(source, filename);
+      let findings;
+      try {
+        findings = rule.check(source, filename);
+      } catch (err) {
+        const id = (rule.meta && rule.meta.id) || rule.file;
+        throw new Error(`Error while running rule '${id}' on ${filename}: ${err.message}`, { cause: err });
+      }
       allFindings.push(...findings);
     }
   }
