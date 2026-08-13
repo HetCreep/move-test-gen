@@ -12,6 +12,9 @@
  * Usage:
  *   node check-coverage.mjs <sources-dir> <tests-dir>
  *   node check-coverage.mjs <sources-dir> <tests-dir> --mutate
+ *   node check-coverage.mjs <sources-dir> <tests-dir> --lint
+ *   node check-coverage.mjs <sources-dir> <tests-dir> --testability
+ *   node check-coverage.mjs <sources-dir> <tests-dir> --scope fund.move,oracle.move
  */
 
 import { readFileSync, readdirSync, writeFileSync, mkdtempSync, cpSync, rmSync } from 'fs';
@@ -411,7 +414,12 @@ function runJointMutant(packageDir, sourceDir, candidate) {
 
 const args = process.argv.slice(2);
 if (args.length < 2) {
-  console.log('Usage: node check-coverage.mjs <sources-dir> <tests-dir> [--mutate] [--scope file1.move,file2.move]');
+  console.log('Usage: node check-coverage.mjs <sources-dir> <tests-dir> [options]');
+  console.log('');
+  console.log('  --mutate                     run Layer 2 mutation testing (needs the sui CLI)');
+  console.log('  --lint                       run the security lint rules');
+  console.log('  --testability                run the testability pre-flight');
+  console.log('  --scope a.move,b.move        only score these source files');
   process.exit(1);
 }
 
