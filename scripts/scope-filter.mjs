@@ -12,5 +12,7 @@
  * @returns {string[]} filtered file list
  */
 export function filterByScope(files, scopeFilter) {
-  return files.filter(f => scopeFilter.some(s => f.endsWith(s)));
+  const norm = (p) => p.split('\\').join('/');
+  const wanted = scopeFilter.map(norm);
+  return files.filter(f => wanted.some(s => norm(f).endsWith(s)));
 }
