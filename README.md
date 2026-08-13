@@ -158,6 +158,29 @@ even when `--mutate` could not run. Exit `3` means no verdict was reached, which
 is a different thing from a verdict of "failed" and should usually be read as a
 broken CI configuration rather than a broken pull request.
 
+## Running on untrusted code
+
+Layer 1 (assert pairing) and `--lint` **never execute or compile** the code they
+read. They are regex and string analysis over the source text, so running them
+on a pull request from a fork is no more dangerous than reading the diff.
+
+`mutate: 'true'` is different. It invokes `sui move build` and `sui move test`
+on the source under review, which means:
+
+- the Move code in the pull request is compiled and its tests are run on your runne
+- the `Move.toml` in the pull request decides which git dependencies get fetched
+
+That is ordinary for any mutation-testing tool — you cannot mutation-test code
+without running it — but it should be a deliberate choice rather than a
+surprise. The shipped nightly example
+(`examples/workflows/nightly-mutation.yml`) runs on a schedule against the
+default branch for exactly this reason, and the pull-request example
+(`examples/workflows/pr-gate.yml`) does not set `mutate` at all.
+
+If you do want Layer 2 on pull requests, run it on `pull_request` (not
+`pull_request_target`), keep `permissions: contents: read`, and do not expose
+secrets to that job.
+
 ## Known limitations
 
 The checker is a regex-based parser, not a compiler. It handles the common patterns — including multi-line asserts, module-qualified aborts, and string literals with `//` — but edge cases exist:
