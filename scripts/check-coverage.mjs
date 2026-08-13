@@ -433,7 +433,13 @@ const [sourceDir, testDir] = args.map(a => resolve(a));
 const doMutate = args.includes('--mutate');
 const doLint = args.includes('--lint');
 const scopeIdx = args.indexOf('--scope');
-const scopeFiles = scopeIdx >= 0 ? args[scopeIdx + 1].split(',').map(f => f.trim()) : null;
+if (scopeIdx >= 0 && !args[scopeIdx + 1]) {
+  console.log('Error: --scope needs a comma-separated file list, e.g. --scope fund.move,oracle.move');
+  process.exit(2);
+}
+const scopeFiles = scopeIdx >= 0
+  ? args[scopeIdx + 1].split(',').map(f => f.trim()).filter(Boolean)
+  : null;
 let mutationWeak = false;
 let mutationSkipped = false;
 
@@ -471,9 +477,19 @@ if (unscopedFailures.length > 0) {
 // scope Layer 1 to target files if --scope is set
 let targetAsserts = allAsserts;
 if (scopeFiles) {
-  targetAsserts = allAsserts.filter(a => scopeFiles.some(s => a.file.endsWith(s)));
+  const norm = (p) => p.split('\\').join('/');
+  const wanted = scopeFiles.map(norm);
+  const inScope = (a) => wanted.some(s => norm(a.file).endsWith(s));
+  targetAsserts = allAsserts.filter(inScope);
+  if (targetAsserts.length === 0 && allAsserts.length > 0) {
+    console.log(`Error: --scope matched no source file (scope: ${scopeFiles.join(', ')})`);
+    console.log(`       ${allAsserts.length} assert site(s) were found, every one of them outside the scope list.`);
+    process.exit(2);
+  }
   if (targetAsserts.length !== allAsserts.length) {
-    console.log(`Scope (Layer 1): ${targetAsserts.length} asserts in target, ${allAsserts.length - targetAsserts.length} in dependencies (not scored)\n`);
+    const excluded = [...new Set(allAsserts.filter(a => !inScope(a)).map(a => a.file))];
+    console.log(`Scope (Layer 1): ${targetAsserts.length} asserts in target, ${allAsserts.length - targetAsserts.length} outside --scope (not scored)`);
+    console.log(`  not scored: ${excluded.join(', ')}\n`);
   }
 }
 
