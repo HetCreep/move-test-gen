@@ -108,7 +108,7 @@ Rules are pure functions in `rules/*.mjs`. The engine skips `#[test_only]` modul
 
 MOV-001 recognizes several Sui Move access control idioms beyond `*Cap`: `Witness<T>`, `Version`, `*Key`, and user-asset parameters (`Coin<T>`, `Balance<T>`, LP tokens) that make a function intentionally permissionless. MOV-005 only flags bool-returning functions (not void functions like `verify()` that abort internally). MOV-006 filters lowercase variable names to avoid flagging parameters used as abort arguments.
 
-**Lab-recorded** (eval scenarios with dated round records): SuiTears and Cetus IntegerMate. **Manual spot-checks** (run outside the lab, no round record): Kriya DEX, Scallop (172 files, 82→1 FP reduction), Bucket Protocol, Turbos CLMM, Typus Finance. MOV-005 catches the exact vulnerability that caused the [Typus Finance $3.44M exploit](https://mehvetero.com) (Oct 2025).
+**Lab-recorded** (eval scenarios with dated round records): SuiTears and Cetus IntegerMate. **Manual spot-checks** (run outside the lab, no round record): Kriya DEX, Scallop (172 files, 82→1 FP reduction), Bucket Protocol, Turbos CLMM, Typus Finance. MOV-005 catches the class of vulnerability reported in the Typus Finance incident (Oct 2025).
 
 Or run lint standalone:
 
@@ -210,7 +210,7 @@ channel assignment — is borrowed, with thanks, from
 
 ## Acknowledgements
 
-Security audit (v1.4.0) by [@HetCreep](https://github.com/HetCreep) — 10 issues + 6 private advisories, zero false positives. The audit caught gate bypasses, CI hardening gaps, and a supply-chain typosquat risk that was filed privately to protect the project.
+Security audit by [@HetCreep](https://github.com/HetCreep), ongoing across several rounds — public issues and private advisories, tracked in the issue list and the Security tab. The audit caught gate bypasses, CI hardening gaps, and a supply-chain typosquat risk that was filed privately to protect the project.
 
 ## References
 
