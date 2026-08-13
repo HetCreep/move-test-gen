@@ -1,4 +1,4 @@
-import { readdirSync, accessSync, constants } from 'fs';
+import { readdirSync } from 'fs';
 import { join } from 'path';
 
 export function walkDir(dir, ext) {
