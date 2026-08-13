@@ -35,12 +35,15 @@ export function check(source, filename) {
 
     if (/#\[test_only\]/.test(trimmed)) {
       testOnlyNext = true;
+      // same-line item (#[test_only] use ...) consumes the attribute immediately
+      const afterAttr = trimmed.replace(/^#\[test_only\]\s*/, '');
+      if (/\b(fun|use|struct|const|entry)\b/.test(afterAttr)) testOnlyNext = false;
       continue;
     }
 
     const isTestOnly = testOnlyNext;
     // clear the flag on ANY item keyword, not just fun — #[test_only] on a use/struct/const
-    // must not carry over to the next function (security advisory #7)
+    // must not carry over to the next function (advisory #7, GHSA-5499)
     if (testOnlyNext && /\b(fun|use|struct|const|entry)\b/.test(trimmed)) testOnlyNext = false;
 
     const fnMatch = trimmed.match(/^public(?:\s*\((?:package|friend)\))?\s+(?:entry\s+)?fun\s+(\w+)(?:<[^>]*>)?\s*\(([^)]*)\)/);

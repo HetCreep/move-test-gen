@@ -48,6 +48,11 @@ export function check(source, filename) {
       isTestFn = true;
     }
 
+    // clear test flag on any item keyword, not just fun (GHSA-5499)
+    if (isTestFn && /\b(fun|use|struct|const|entry)\b/.test(trimmed)) {
+      if (!/\bfun\s+\w+/.test(trimmed)) { isTestFn = false; }
+    }
+
     // detect function start
     if (/\bfun\s+\w+/.test(trimmed)) {
       inFunction = true;

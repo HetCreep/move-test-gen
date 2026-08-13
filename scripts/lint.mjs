@@ -1,3 +1,4 @@
+import { stripBlockComments } from "./strip-comments.mjs";
 /**
  * lint.mjs — security lint engine for Sui Move source code.
  *
@@ -125,7 +126,7 @@ export async function runLint(sourcesDir, options = {}) {
 
     // skip test-only modules: #[test_only] must precede the first module declaration
     const moduleIdx = source.search(/\bmodule\b/);
-    const prefix = moduleIdx >= 0 ? source.slice(0, moduleIdx) : '';
+    const prefix = stripBlockComments(moduleIdx >= 0 ? source.slice(0, moduleIdx) : '');
     if (/^\s*#\[test_only\]/m.test(prefix)) continue;
 
     const suppressions = parseSuppressions(source);
