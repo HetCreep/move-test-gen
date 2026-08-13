@@ -26,6 +26,12 @@ Install via the skills CLI:
 npx skills add mehvetero/move-test-gen
 ```
 
+> `skills add` resolves against the default branch and carries no version, so
+> it always installs the current `main` — including changes that are in no
+> released tag. That is usually what you want for a Claude Code skill, which
+> updates in place. If you need a fixed version, install from a tag instead of
+> the branch, or use the GitHub Action, which is pinned by ref.
+
 > **Windows note:** if PowerShell blocks `npx` with an execution-policy error,
 > run `npx.cmd skills add mehvetero/move-test-gen` instead (stock PowerShell
 > default, not a skill issue).
