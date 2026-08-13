@@ -41,8 +41,11 @@ const out2 = (r2.stdout || '') + (r2.stderr || '');
 const asserts2 = out2.match(/Asserts found:\s+(\d+)/);
 check('pre-scope assert count unchanged with --scope', asserts2 && Number(asserts2[1]) === 11);
 
-// Verify exit code is a specific integer, not just "not null"
-check('scope run exits with code 0 or 1', r2.status === 0 || r2.status === 1);
+// A --scope list that matches no source file is a usage error, not a verdict:
+// nothing was measured, so "the gate failed" would be the wrong signal. It exits
+// 2 under the exit-code contract agreed in #19. This case previously accepted
+// 0 or 1, which its own comment admits was looser than intended.
+check('scope matching no file exits 2 (usage error)', r2.status === 2);
 
 if (errs.length) {
   console.log('FAIL:');
