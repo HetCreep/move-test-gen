@@ -1,5 +1,6 @@
-import { stripBlockComments } from "./strip-comments.mjs";
 #!/usr/bin/env node
+
+import { stripBlockComments } from "./strip-comments.mjs";
 
 /**
  * check-coverage.mjs
