@@ -1,0 +1,5 @@
+{
+  "note": "MOV-001 exemptions are deliberate, so pin them: init/test_*/_test/testing/destroy are skipped, and a plain public fun is not",
+  "type": "script",
+  "script": "test.mjs"
+}
