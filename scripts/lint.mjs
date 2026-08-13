@@ -54,7 +54,54 @@ export function validateRule(mod, file) {
   }
 }
 
-export async function runLint(sourcesDir) {
+
+const DISABLE_FILE_RE = /^\s*\/\/\s*move-test-gen-disable\s+(.+?)\s*$/;
+const DISABLE_NEXT_RE = /^\s*\/\/\s*move-test-gen-disable-next-line\s+(.+?)\s*$/;
+
+const parseRuleList = (raw) =>
+  raw.split(',').map(r => r.trim().toUpperCase()).filter(Boolean);
+
+/**
+ * Read the suppression comments out of one file.
+ *
+ * A comment pragma rather than a Move attribute: `#[allow(lint(...))]` is the
+ * compiler's namespace, not ours, so an unknown attribute there risks a warning
+ * from `sui move build`, while a comment stays invisible to it.
+ */
+export function parseSuppressions(source) {
+  const lines = source.split('\n');
+  const file = new Set();
+  const byLine = new Map();
+  for (let i = 0; i < lines.length; i++) {
+    const nextMatch = lines[i].match(DISABLE_NEXT_RE);
+    if (nextMatch) {
+      for (let j = i + 1; j < lines.length; j++) {
+        const t = lines[j].trim();
+        if (t === '' || t.startsWith('//')) continue;
+        const set = byLine.get(j + 1) || new Set();
+        for (const r of parseRuleList(nextMatch[1])) set.add(r);
+        byLine.set(j + 1, set);
+        break;
+      }
+      continue;
+    }
+    const fileMatch = lines[i].match(DISABLE_FILE_RE);
+    if (fileMatch) for (const r of parseRuleList(fileMatch[1])) file.add(r);
+  }
+  return { file, byLine };
+}
+
+/** Suppressed by this file's own pragmas, or by a run-wide --disable? */
+export function isSuppressed(finding, suppressions, disabled) {
+  const rule = String(finding.rule || '').toUpperCase();
+  if (disabled.has(rule)) return true;
+  if (suppressions.file.has(rule)) return true;
+  const atLine = suppressions.byLine.get(finding.line);
+  return Boolean(atLine && atLine.has(rule));
+}
+export async function runLint(sourcesDir, options = {}) {
+  const disabled = new Set((options.disable || [])
+    .map(r => String(r).trim().toUpperCase()).filter(Boolean));
   // load rules
   const ruleFiles = readdirSync(RULES_DIR)
     .filter(f => f.endsWith('.mjs') && f.startsWith('mov-'))
@@ -70,6 +117,7 @@ export async function runLint(sourcesDir) {
   // load sources
   const sourceFiles = walkDir(resolve(sourcesDir), '.move');
   const allFindings = [];
+  let suppressed = 0;
 
   for (const srcPath of sourceFiles) {
     const source = readFileSync(srcPath, 'utf8');
@@ -80,6 +128,8 @@ export async function runLint(sourcesDir) {
     const prefix = moduleIdx >= 0 ? source.slice(0, moduleIdx) : '';
     if (/^\s*#\[test_only\]/m.test(prefix)) continue;
 
+    const suppressions = parseSuppressions(source);
+
     for (const rule of rules) {
       let findings;
       try {
@@ -88,21 +138,28 @@ export async function runLint(sourcesDir) {
         const id = (rule.meta && rule.meta.id) || rule.file;
         throw new Error(`Error while running rule '${id}' on ${filename}: ${err.message}`, { cause: err });
       }
-      allFindings.push(...findings);
+      for (const finding of findings) {
+        if (isSuppressed(finding, suppressions, disabled)) {
+          suppressed++;
+          continue;
+        }
+        allFindings.push(finding);
+      }
     }
   }
 
-  return { findings: allFindings, ruleCount: rules.length };
+  return { findings: allFindings, ruleCount: rules.length, suppressed };
 }
 
 /**
  * Print lint results to console.
  */
-export function printLintResults(findings, ruleCount) {
+export function printLintResults(findings, ruleCount, suppressed = 0) {
   console.log(`\n=== Security Lint (${ruleCount} rules) ===\n`);
 
   if (findings.length === 0) {
     console.log('No findings.\n');
+    if (suppressed > 0) console.log(`(${suppressed} finding(s) suppressed)\n`);
     return;
   }
 
@@ -121,7 +178,8 @@ export function printLintResults(findings, ruleCount) {
   const counts = {};
   for (const f of findings) counts[f.severity] = (counts[f.severity] || 0) + 1;
   const summary = Object.entries(counts).map(([s, n]) => `${n} ${s.toLowerCase()}`).join(', ');
-  console.log(`\n${findings.length} finding(s): ${summary}`);
+  const note = suppressed > 0 ? `  (${suppressed} suppressed)` : '';
+  console.log(`\n${findings.length} finding(s): ${summary}${note}`);
 }
 
 // Severity ordering, shared by the standalone CLI and the gate so the two can
@@ -144,8 +202,10 @@ if (process.argv[1] && process.argv[1].endsWith('lint.mjs')) {
     console.log('Usage: node scripts/lint.mjs <sources-dir>');
     process.exit(2);
   }
-  const { findings, ruleCount } = await runLint(dir);
-  printLintResults(findings, ruleCount);
+  const disIdx = process.argv.indexOf('--disable');
+  const disable = disIdx >= 0 ? String(process.argv[disIdx + 1] || '').split(',') : [];
+  const { findings, ruleCount, suppressed } = await runLint(dir, { disable });
+  printLintResults(findings, ruleCount, suppressed);
   const failIdx = process.argv.indexOf('--fail-on');
   const threshold = failIdx >= 0 ? process.argv[failIdx + 1] : 'high';
   if (shouldFail(findings, threshold)) {

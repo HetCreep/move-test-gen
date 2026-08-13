@@ -24,6 +24,10 @@ inputs:
     description: 'Run security pattern detection (MOV-001 through MOV-006)'
     required: false
     default: 'false'
+  disable:
+    description: 'Comma-separated rule IDs to disable repo-wide, e.g. MOV-003,MOV-006'
+    required: false
+    default: ''
   fail-on:
     description: 'Lint severity that fails the build: critical | high | medium | low | none'
     required: false
@@ -60,6 +64,7 @@ runs:
         MTG_MUTATE: ${{ inputs.mutate }}
         MTG_SCOPE: ${{ inputs.scope }}
         MTG_LINT: ${{ inputs.lint }}
+        MTG_DISABLE: ${{ inputs.disable }}
         MTG_FAIL_ON: ${{ inputs.fail-on }}
       run: |
         GATE="${GITHUB_ACTION_PATH}/scripts/check-coverage.mjs"
@@ -79,6 +84,7 @@ runs:
         is_true "$MTG_MUTATE" mutate && args+=( --mutate )
         [ -n "$MTG_SCOPE" ] && args+=( --scope "$MTG_SCOPE" )
         is_true "$MTG_LINT" lint && args+=( --lint )
+        [ -n "$MTG_DISABLE" ] && args+=( --disable "$MTG_DISABLE" )
         [ -n "$MTG_FAIL_ON" ] && args+=( --fail-on "$MTG_FAIL_ON" )
         args+=( --json "${RUNNER_TEMP:-/tmp}/move-test-gen.json" )
         set +e
