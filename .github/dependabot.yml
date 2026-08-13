@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # package.json declares no runtime dependencies, so GitHub Actions is the
+  # only ecosystem here with anything that can drift.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(actions)"
+    groups:
+      actions:
+        patterns: ["*"]
