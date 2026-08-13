@@ -24,6 +24,22 @@ inputs:
     description: 'Run security pattern detection (MOV-001 through MOV-006)'
     required: false
     default: 'false'
+outputs:
+  coverage-percent:
+    description: 'Assert coverage percentage'
+    value: ${{ steps.gate.outputs.coverage-percent }}
+  unpaired-count:
+    description: 'Number of asserts with no expected_failure test'
+    value: ${{ steps.gate.outputs.unpaired-count }}
+  mutation-score:
+    description: 'Mutation score, or empty when Layer 2 did not run'
+    value: ${{ steps.gate.outputs.mutation-score }}
+  survivor-count:
+    description: 'Surviving mutants, or empty when Layer 2 did not run'
+    value: ${{ steps.gate.outputs.survivor-count }}
+  lint-findings:
+    description: 'Number of lint findings, or empty when --lint was not requested'
+    value: ${{ steps.gate.outputs.lint-findings }}
 runs:
   using: 'composite'
   steps:
@@ -32,6 +48,7 @@ runs:
       with:
         node-version: 20
     - name: Run coverage check
+      id: gate
       shell: bash
       env:
         MTG_SOURCES: ${{ inputs.sources }}
@@ -45,4 +62,42 @@ runs:
         [ "$MTG_MUTATE" = "true" ] && args+=( --mutate )
         [ -n "$MTG_SCOPE" ] && args+=( --scope "$MTG_SCOPE" )
         [ "$MTG_LINT" = "true" ] && args+=( --lint )
+        args+=( --json "${RUNNER_TEMP:-/tmp}/move-test-gen.json" )
+        set +e
         node "$GATE" "${args[@]}"
+        gate_rc=$?
+        set -e
+
+        REPORT="${RUNNER_TEMP:-/tmp}/move-test-gen.json"
+        if [ -f "$REPORT" ]; then
+          node -e '
+            const fs = require("fs");
+            const r = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const out = process.env.GITHUB_OUTPUT;
+            const put = (k, v) => fs.appendFileSync(out, `${k}=${v ?? ""}\n`);
+            put("coverage-percent", r.coverage.percent);
+            put("unpaired-count", r.coverage.unpaired.length);
+            put("mutation-score", r.mutation && !r.mutation.skipped ? r.mutation.score : "");
+            put("survivor-count", r.mutation && !r.mutation.skipped ? r.mutation.survived : "");
+            put("lint-findings", r.lint ? r.lint.findings.length : "");
+
+            const s = process.env.GITHUB_STEP_SUMMARY;
+            if (s) {
+              const rows = [
+                ["Assert coverage", `${r.coverage.percent}% (${r.coverage.covered}/${r.coverage.total})`],
+                ["Unpaired asserts", String(r.coverage.unpaired.length)],
+              ];
+              if (r.mutation && !r.mutation.skipped) {
+                rows.push(["Mutation score", `${r.mutation.score}%`]);
+                rows.push(["Surviving mutants", String(r.mutation.survived)]);
+              } else if (r.mutation) {
+                rows.push(["Mutation", "requested, could not run"]);
+              }
+              if (r.lint) rows.push(["Lint findings", String(r.lint.findings.length)]);
+              fs.appendFileSync(s,
+                "### move-test-gen\n\n| | |\n|---|---|\n" +
+                rows.map(([k, v]) => `| ${k} | ${v} |`).join("\n") + "\n");
+            }
+          ' "$REPORT"
+        fi
+        exit $gate_rc
