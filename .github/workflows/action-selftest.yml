@@ -49,11 +49,24 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - name: Verify lint runs (findings expected on example code)
+      - name: Lint through the action on a clean tree (must pass)
+        uses: ./
+        with:
+          sources: eval/gate-selftest/cases/04-shared-code-warning/sources
+          tests: eval/gate-selftest/cases/04-shared-code-warning/tests
+          lint: 'true'
+      - name: Lint must FAIL on a tree with HIGH findings
         shell: bash
         run: |
           GATE="${GITHUB_WORKSPACE}/scripts/check-coverage.mjs"
-          node "$GATE" examples/sources examples/tests --lint > /tmp/lint-out.txt 2>&1 || true
+          set +e
+          node "$GATE" examples/sources examples/tests --lint > /tmp/lint-out.txt 2>&1
+          rc=$?
+          set -e
           cat /tmp/lint-out.txt
+          if [ "$rc" -eq 0 ]; then
+            echo "FAIL: examples/sources has HIGH findings but the gate exited 0"
+            exit 1
+          fi
           grep -q "Security Lint" /tmp/lint-out.txt || { echo "FAIL: lint did not run"; exit 1; }
-          echo "lint executed — findings on example code are expected, not a failure"
+          echo "lint exited $rc on a tree with HIGH findings, as expected"
