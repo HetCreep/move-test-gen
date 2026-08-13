@@ -20,7 +20,7 @@ const SEVERITY = 'LOW';
 const TITLE = 'abort code shared across multiple public functions';
 
 const ASSERT_RE = /assert!\s*\([^,]+,\s*(\w+)\s*\)/g;
-const FUN_RE = /^\s*(public\s+(?:entry\s+)?fun|entry\s+fun|public\s*\(friend\)\s+fun)\s+(\w+)/;
+const FUN_RE = /^\s*(public\s+(?:entry\s+)?fun|entry\s+fun|public\s*\(friend\)\s+fun|public\s*\(package\)\s+fun)\s+(\w+)/;
 const TEST_ATTR_RE = /^\s*#\[test/;
 const TEST_ONLY_ATTR_RE = /^\s*#\[test_only\]/;
 

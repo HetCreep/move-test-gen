@@ -125,7 +125,7 @@ function parseFunctionSignature(lines, startIdx) {
   const line = lines[startIdx].trim();
 
   // match function declaration
-  const fnRegex = /^(public\s+entry\s+|public\(friend\)\s+|public\s+|entry\s+)?fun\s+(\w+)(?:<([^>]*)>)?\s*\(/;
+  const fnRegex = /^(public\s+entry\s+|public\(friend\)\s+|public\(package\)\s+|public\s+|entry\s+)?fun\s+(\w+)(?:<([^>]*)>)?\s*\(/;
   const m = line.match(fnRegex);
   if (!m) return null;
 
