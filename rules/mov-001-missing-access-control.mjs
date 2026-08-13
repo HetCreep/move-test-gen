@@ -77,7 +77,7 @@ function checkFunction(name, params, lineNo, filename, findings, isTestOnly) {
   if (!hasMut) return;
 
   // does it have a capability or key parameter?
-  const hasCap = /[A-Z]\w*Cap\b|AdminCap|OwnerCap|ManagerCap|AuthCap|[A-Z]\w*Key\b/.test(params);
+  const hasCap = /[A-Z]\w*Cap\b|\bCap\b|[A-Z]\w*Key\b|\bKey\b/.test(params);
   if (hasCap) return;
 
   // does it have a witness parameter that implies auth?
