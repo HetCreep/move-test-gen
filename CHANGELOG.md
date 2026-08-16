@@ -5,6 +5,17 @@ Notable changes per released tag. Dates are the tag's commit date.
 Generated from `git log` between tags — if an entry looks wrong, the commit
 history is the source of truth.
 
+## v1.5.1 — 2026-08-16
+
+Security patch. Fixes GHSA-w7pc-q6qh-49qw, which was declared fixed in v1.5.0 but was not.
+
+- Assert regex now tolerates parenthesised abort codes `(EBad)` and trailing commas `EWorse,`
+- An assert site the regex cannot parse is recorded as `unparsed`, printed with its location, and fails the run — instead of vanishing from both sides of the ratio
+- A zero denominator reports `n/a` instead of `100% (0/0)`
+- A sources path with no `.move` files is a hard failure
+
+PR #51 by [@HetCreep](https://github.com/HetCreep). Issue #50.
+
 ## v1.5.0 — 2026-08-13
 
 Major community release. 23 pull requests merged from [@HetCreep](https://github.com/HetCreep), 3 security advisories patched, and the first external contributor joined the project.
