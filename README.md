@@ -1,6 +1,6 @@
 # move-test-gen
 
-![gate-selftest](https://github.com/mehvetero/move-test-gen/actions/workflows/gate.yml/badge.svg)
+![gate-selftest](https://github.com/talongate/move-test-gen/actions/workflows/gate.yml/badge.svg)
 
 > **Using this as a GitHub Action?** Jump to [CI integration](#ci-integration).
 
@@ -23,7 +23,7 @@ Output is a `.move` test file targeting `sui move test`. The example in `example
 Install via the skills CLI:
 
 ```
-npx skills add mehvetero/move-test-gen
+npx skills add talongate/move-test-gen
 ```
 
 > `skills add` resolves against the default branch and carries no version, so
@@ -33,7 +33,7 @@ npx skills add mehvetero/move-test-gen
 > the branch, or use the GitHub Action, which is pinned by ref.
 
 > **Windows note:** if PowerShell blocks `npx` with an execution-policy error,
-> run `npx.cmd skills add mehvetero/move-test-gen` instead (stock PowerShell
+> run `npx.cmd skills add talongate/move-test-gen` instead (stock PowerShell
 > default, not a skill issue).
 
 Or manually place it in your Claude Code environment:
@@ -226,7 +226,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: mehvetero/move-test-gen@v1.5.0
+      - uses: talongate/move-test-gen@v1.5.1
         with:
           sources: sources
           tests: tests
@@ -237,8 +237,8 @@ Layer 1 (assert pairing) runs in seconds with zero dependencies. For mutation te
 Or run the checker standalone:
 
 ```bash
-npx mehvetero/move-test-gen sources tests
-npx mehvetero/move-test-gen sources tests --mutate
+npx talongate/move-test-gen sources tests
+npx talongate/move-test-gen sources tests --mutate
 ```
 
 ## Eval lab

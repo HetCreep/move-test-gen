@@ -15,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/mehvetero/move-test-gen"
+    "url": "https://github.com/talongate/move-test-gen"
   },
   "license": "MIT"
 }
