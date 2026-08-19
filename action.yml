@@ -107,8 +107,11 @@ runs:
 
             const s = process.env.GITHUB_STEP_SUMMARY;
             if (s) {
+              const coveragePct = r.coverage.percent === null
+                ? "n/a"
+                : `${r.coverage.percent}%`;
               const rows = [
-                ["Assert coverage", `${r.coverage.percent}% (${r.coverage.covered}/${r.coverage.total})`],
+                ["Assert coverage", `${coveragePct} (${r.coverage.covered}/${r.coverage.total})`],
                 ["Unpaired asserts", String(r.coverage.unpaired.length)],
               ];
               if (r.mutation && !r.mutation.skipped) {
