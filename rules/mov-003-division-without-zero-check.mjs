@@ -81,50 +81,61 @@ export function check(source, filename) {
 }
 
 function analyzeFn(fnLines, filename, findings) {
-  // collect all zero-checked variables in this function
+  // Zero-checked variables, built up as we walk the function top to bottom --
+  // Move executes in source order, so a check below a division never ran
+  // before it. Single forward pass: evaluate this line's divisions against
+  // whatever was checked on EARLIER lines, then add this line's own checks.
   const checkedVars = new Set();
 
-  for (const { text } of fnLines) {
-    // assert!(x != 0, ...) or assert!(x > 0, ...)
-    const checkMatch = text.match(/assert!\s*\(\s*(\w+)\s*(!= 0|> 0)/);
-    if (checkMatch) checkedVars.add(checkMatch[1]);
-
-    // x != 0 in if condition
-    const ifCheck = text.match(/if\s*\(\s*(\w+)\s*(!= 0|> 0|== 0)/);
-    if (ifCheck) checkedVars.add(ifCheck[1]);
-  }
-
-  // now find divisions
   for (const { text, lineNo } of fnLines) {
-    if (text.startsWith('//')) continue;
+    if (!text.startsWith('//')) {
+      // match: expr / variable (not literal)
+      const divMatches = [...text.matchAll(/(\w+)\s*\/\s*(\w+)/g)];
+      for (const m of divMatches) {
+        const denom = m[2];
 
-    // match: expr / variable (not literal)
-    const divMatches = [...text.matchAll(/(\w+)\s*\/\s*(\w+)/g)];
-    for (const m of divMatches) {
-      const denom = m[2];
+        // skip literal denominators (numbers)
+        if (/^\d+$/.test(denom)) continue;
 
-      // skip literal denominators (numbers)
-      if (/^\d+$/.test(denom)) continue;
+        // skip if denominator was checked on an earlier line
+        if (checkedVars.has(denom)) continue;
 
-      // skip if denominator was checked
-      if (checkedVars.has(denom)) continue;
+        // skip if denom is a field access result (likely checked elsewhere)
+        // but still flag — better to warn than miss
 
-      // skip if denom is a field access result (likely checked elsewhere)
-      // but still flag — better to warn than miss
+        // skip comment-like patterns
+        if (text.includes('//')) {
+          const commentStart = text.indexOf('//');
+          if (m.index > commentStart) continue;
+        }
 
-      // skip comment-like patterns
-      if (text.includes('//')) {
-        const commentStart = text.indexOf('//');
-        if (m.index > commentStart) continue;
+        findings.push({
+          rule: RULE_ID,
+          severity: SEVERITY,
+          file: filename,
+          line: lineNo,
+          message: `${TITLE}: \`/ ${denom}\` — add \`assert!(${denom} != 0, E...)\` before dividing`,
+        });
       }
 
-      findings.push({
-        rule: RULE_ID,
-        severity: SEVERITY,
-        file: filename,
-        line: lineNo,
-        message: `${TITLE}: \`/ ${denom}\` — add \`assert!(${denom} != 0, E...)\` before dividing`,
-      });
+      // Checks on THIS line protect divisions on LATER lines only (added
+      // after the division scan above, not before). Guarded by the same
+      // "not a comment line" check as the division scan -- a commented-out
+      // `assert!` must not register as a real check either.
+
+      // assert!(x != 0, ...) or assert!(x > 0, ...)
+      const checkMatch = text.match(/assert!\s*\(\s*(\w+)\s*(!= 0|> 0)/);
+      if (checkMatch) checkedVars.add(checkMatch[1]);
+
+      // x != 0 / x > 0 in an if condition
+      const ifCheck = text.match(/if\s*\(\s*(\w+)\s*(!= 0|> 0)/);
+      if (ifCheck) checkedVars.add(ifCheck[1]);
+
+      // x == 0 only counts as a guard if this same line also aborts --
+      // `if (x == 0) {}` (or any non-aborting body) checks nothing and must
+      // not silence a real division below it.
+      const zeroGuard = text.match(/if\s*\(\s*(\w+)\s*== 0\s*\).*\b(abort|assert!\s*\(\s*false)\b/);
+      if (zeroGuard) checkedVars.add(zeroGuard[1]);
     }
   }
 }
