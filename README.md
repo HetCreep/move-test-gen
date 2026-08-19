@@ -167,7 +167,7 @@ on a pull request from a fork is no more dangerous than reading the diff.
 `mutate: 'true'` is different. It invokes `sui move build` and `sui move test`
 on the source under review, which means:
 
-- the Move code in the pull request is compiled and its tests are run on your runne
+- the Move code in the pull request is compiled and its tests are run on your runner
 - the `Move.toml` in the pull request decides which git dependencies get fetched
 
 That is ordinary for any mutation-testing tool — you cannot mutation-test code
