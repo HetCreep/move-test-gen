@@ -55,6 +55,21 @@ function tomlPin(scenarioDir) {
   return m ? m[1] : null;
 }
 
+// A [dependencies] section that is present but genuinely empty (some
+// scenarios have none) has nothing to pin -- that is not the same thing
+// as a section that DOES list a dependency with no rev on it, which is a
+// real reproducibility gap doctor should fail on.
+function hasUnpinnedDependencies(scenarioDir) {
+  const p = join(scenarioDir, 'Move.toml');
+  if (!existsSync(p)) return false;
+  const content = readFileSync(p, 'utf8');
+  const m = content.match(/\[dependencies\]([\s\S]*?)(?:\n\[|\s*$)/);
+  if (!m) return false;
+  const body = m[1].trim();
+  if (body === '') return false;
+  return !/rev\s*=\s*"/.test(body);
+}
+
 function listMoveFiles(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).filter((f) => f.endsWith('.move'));
@@ -175,7 +190,15 @@ function cmdDoctor() {
     const dir = join(scenRoot, name);
     if (!existsSync(join(dir, 'sources'))) continue;
     const pin = tomlPin(dir);
-    if (!pin) { console.log(`  ${name}: no Move.toml rev pin found`); continue; }
+    if (!pin) {
+      if (hasUnpinnedDependencies(dir)) {
+        ok = false;
+        console.log(`✗ ${name}: [dependencies] present but no rev pin found — the baseline is not reproducible`);
+      } else {
+        console.log(`  ${name}: no Move.toml rev pin found (no dependencies to pin)`);
+      }
+      continue;
+    }
     const pinVer = (pin.match(/(\d+\.\d+\.\d+)/) || [])[1];
     if (sui && pinVer && sui !== pinVer) {
       ok = false;
