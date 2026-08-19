@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * MOV-001 skips a set of function names on purpose (rules/mov-001:71-73).
+ * MOV-001 skips a set of function names on purpose (checkFunction()'s name
+ * checks, in rules/mov-001-missing-access-control.mjs).
  * Nothing pinned that, so the list could be widened or narrowed by accident and
  * no test would notice — and a widened exemption list is a silent gate bypass.
  *

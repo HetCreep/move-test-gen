@@ -26,6 +26,8 @@ trusting any gate change, and in CI.
 | 09-scope-pure-fn | The `scope-filter.mjs` pure function: only files ending with scope entries pass through. |
 | 10-testability-check | Testability pre-flight: modules with CoinMetadata + no `#[test_only]` warn; modules with constructors pass. |
 | 11-lint-rules | All 6 lint rules (MOV-001 through MOV-006): synthetic Move source, no sui needed. Pins positive detection, false-positive suppression, and test-function skip for each rule. |
+| 12-mov001-exemptions | MOV-001's name-based exemption list (`init`, `test_*`, `*_test`, `testing`, `destroy`) is pinned exactly — nothing else stops it from being widened or narrowed by accident, and a widened list is a silent gate bypass. Also pins that the exemption is name-based: `init` is skipped whatever it does. |
+| 13-lint-endtoend | Case 11 covers each rule's `check()` directly, not what's around it. This spawns the real CLI twice — once against a tree with a HIGH finding, once against a clean tree — and asserts the exit code both ways, covering `lint.mjs`'s rule discovery/count and `check-coverage.mjs`'s severity-to-exit mapping. |
 
 ## Known limitations
 
