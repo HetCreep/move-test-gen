@@ -244,15 +244,16 @@ fun test_not_expired_one_ms_before() {
 }
 
 #[test]
-fun test_expired_at_exact_deadline() {
+fun test_not_expired_at_exact_deadline() {
     // setup: `thing` must be created with an expiry of EXPIRY_MS
     let mut ctx = tx_context::dummy();
     let mut clock = clock::create_for_testing(&mut ctx);
     clock::set_for_testing(&mut clock, EXPIRY_MS);
     let result = module::is_active(&thing, &clock);
-    // The protocol decides whether EXPIRY_MS is the last valid
-    // moment or the first invalid one. Assert the intended choice
-    // here; flip to `false` if the contract uses strict `<`.
+    // The protocol decides whether EXPIRY_MS is the last valid moment
+    // (inclusive, `<=`) or the first invalid one (exclusive, `<`). This
+    // template defaults to inclusive -- rename to test_expired_at_exact_deadline
+    // and flip to `assert!(result == false)` if the contract uses strict `<`.
     assert!(result == true);
     clock::destroy_for_testing(clock);
 }
