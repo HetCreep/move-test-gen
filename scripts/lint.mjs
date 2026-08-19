@@ -210,10 +210,14 @@ if (process.argv[1] && process.argv[1].endsWith('lint.mjs')) {
     ({ findings, ruleCount, suppressed } = await runLint(dir, { disable }));
   } catch (e) {
     // Match check-coverage.mjs's own contract (exit 2, usage error) for the
-    // same failure -- an unhandled ENOENT here previously crashed with a raw
+    // same failure -- an unhandled error here previously crashed with a raw
     // stack trace at exit 1, which the documented README table reserves for
-    // "the gate failed" (real findings), not "couldn't read the directory".
-    console.error(`Error: cannot read directory — ${e.message}`);
+    // "the gate failed" (real findings), not a config/usage problem. Message
+    // stays generic rather than naming a directory specifically: runLint()
+    // throws for two unrelated reasons (an unreadable sources dir, or a
+    // malformed rule file that validateRule() rejects), and "cannot read
+    // directory" is wrong for the second one.
+    console.error(`Error: lint could not run — ${e.message}`);
     process.exit(2);
   }
   printLintResults(findings, ruleCount, suppressed);
