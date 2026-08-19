@@ -92,6 +92,39 @@ export function parseSuppressions(source) {
   return { file, byLine };
 }
 
+/**
+ * Which line ranges belong to a #[test_only] module.
+ *
+ * The old check only ever asked "does #[test_only] appear anywhere before
+ * the FIRST module keyword in the file" -- so a harmless #[test_only]
+ * module placed first in a multi-module file skipped every rule for the
+ * WHOLE file, including a real, unguarded module later in the same file.
+ * This walks every module boundary and scopes the decision to each
+ * module's own preceding text, so only that module's findings are dropped.
+ *
+ * Returns 1-indexed, inclusive [startLine, endLine] pairs.
+ */
+export function findTestOnlyModuleRanges(source) {
+  const lines = stripBlockComments(source).split('\n');
+  const moduleLines = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (/\bmodule\b/.test(lines[i])) moduleLines.push(i);
+  }
+  const ranges = [];
+  for (let m = 0; m < moduleLines.length; m++) {
+    const startIdx = moduleLines[m];
+    const endIdx = m + 1 < moduleLines.length ? moduleLines[m + 1] - 1 : lines.length - 1;
+    const prevEnd = m > 0 ? moduleLines[m - 1] : -1;
+    const prefix = lines.slice(prevEnd + 1, startIdx).join('\n');
+    if (/^\s*#\[test_only\]/m.test(prefix)) ranges.push([startIdx + 1, endIdx + 1]);
+  }
+  return ranges;
+}
+
+function isInTestOnlyModule(line, ranges) {
+  return ranges.some(([s, e]) => line >= s && line <= e);
+}
+
 /** Suppressed by this file's own pragmas, or by a run-wide --disable? */
 export function isSuppressed(finding, suppressions, disabled) {
   const rule = String(finding.rule || '').toUpperCase();
@@ -124,10 +157,10 @@ export async function runLint(sourcesDir, options = {}) {
     const source = readFileSync(srcPath, 'utf8');
     const filename = relative(process.cwd(), srcPath);
 
-    // skip test-only modules: #[test_only] must precede the first module declaration
-    const moduleIdx = source.search(/\bmodule\b/);
-    const prefix = stripBlockComments(moduleIdx >= 0 ? source.slice(0, moduleIdx) : '');
-    if (/^\s*#\[test_only\]/m.test(prefix)) continue;
+    // skip #[test_only] modules -- scoped per module, not per file: a
+    // test-only module earlier in the file must not silence a real module
+    // later in the same file (findTestOnlyModuleRanges above).
+    const testOnlyRanges = findTestOnlyModuleRanges(source);
 
     const suppressions = parseSuppressions(source);
 
@@ -140,6 +173,7 @@ export async function runLint(sourcesDir, options = {}) {
         throw new Error(`Error while running rule '${id}' on ${filename}: ${err.message}`, { cause: err });
       }
       for (const finding of findings) {
+        if (isInTestOnlyModule(finding.line, testOnlyRanges)) continue;
         if (isSuppressed(finding, suppressions, disabled)) {
           suppressed++;
           continue;
