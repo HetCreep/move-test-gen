@@ -22,7 +22,14 @@ function normFile(f) {
  * @returns {{ candidates: Array<{code, file, lines: number[]}>, survivorDetails: Array }}
  */
 export function identifyProbeCandidates(allResults, allAsserts) {
-  const survived = allResults.filter(r => !r.killed);
+  // A timed-out mutation carries killed:false too (no verdict was reached,
+  // not "the test failed to catch it"), so excluding only !killed let a
+  // timed-out result stand in as if it were a genuine survivor -- grouping
+  // it with real survivors and letting the joint-probe's "mutual
+  // redundancy" evidence rest partly on an undecided run. The gate's own
+  // caller already filters timedOut out before its finalizeEvidence() call;
+  // this makes the same guarantee hold here too, not just at the call site.
+  const survived = allResults.filter(r => !r.killed && !r.timedOut);
   if (survived.length === 0) return { candidates: [], survivorDetails: survived };
 
   const dropSurvivors = survived.filter(s => s.mutation === 'drop-assert');
