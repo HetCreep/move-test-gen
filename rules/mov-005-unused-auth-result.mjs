@@ -43,9 +43,6 @@ const SAFE_CONTEXTS = [
   /\bif\s*[\s(]/,
   /\bwhile\s*\(/,
   /\breturn\b/,
-  /&&/,
-  /\|\|/,
-  /^!/,
   /=\s*$/,
 ];
 
