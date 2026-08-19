@@ -327,8 +327,14 @@ function parseBody(bodyLines, offset) {
       });
     }
 
+    // A trailing `//` comment is not code -- matching against it can turn a
+    // lookalike mention (e.g. `// old code used (x as u64) here`) into a
+    // phantom finding alongside the real one. The loop-level comment-only-
+    // line skip above only covers a comment that IS the whole line.
+    const codeOnly = trimmed.replace(/\/\/.*$/, '').trim();
+
     // type casts: (expr as uXX) — handle both simple and nested parens
-    for (const cm of trimmed.matchAll(/\(([^)]+?)\s+as\s+(u(?:8|16|32|64|128|256))\)/g)) {
+    for (const cm of codeOnly.matchAll(/\(([^)]+?)\s+as\s+(u(?:8|16|32|64|128|256))\)/g)) {
       casts.push({
         line: lineNo,
         expr: cm[1].trim(),
@@ -337,7 +343,7 @@ function parseBody(bodyLines, offset) {
       });
     }
     // also catch `) as uXX)` pattern (closing a multi-line expression)
-    const trailingCast = trimmed.match(/\)\s+as\s+(u(?:8|16|32|64|128|256))\)\s*;?\s*$/);
+    const trailingCast = codeOnly.match(/\)\s+as\s+(u(?:8|16|32|64|128|256))\)\s*;?\s*$/);
     if (trailingCast) {
       casts.push({
         line: lineNo,
@@ -348,8 +354,7 @@ function parseBody(bodyLines, offset) {
     }
 
     // multiplications
-    for (const mm of trimmed.matchAll(/(\w+)\s*\*\s*(\w+)/g)) {
-      if (trimmed.startsWith('//')) continue;
+    for (const mm of codeOnly.matchAll(/(\w+)\s*\*\s*(\w+)/g)) {
       multiplications.push({
         line: lineNo,
         left: mm[1],
@@ -360,8 +365,7 @@ function parseBody(bodyLines, offset) {
     }
 
     // divisions
-    for (const dm of trimmed.matchAll(/(\w+)\s*\/\s*(\w+)/g)) {
-      if (trimmed.startsWith('//')) continue;
+    for (const dm of codeOnly.matchAll(/(\w+)\s*\/\s*(\w+)/g)) {
       divisions.push({
         line: lineNo,
         numerator: dm[1],
