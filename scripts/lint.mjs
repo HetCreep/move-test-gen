@@ -205,7 +205,17 @@ if (process.argv[1] && process.argv[1].endsWith('lint.mjs')) {
   }
   const disIdx = process.argv.indexOf('--disable');
   const disable = disIdx >= 0 ? String(process.argv[disIdx + 1] || '').split(',') : [];
-  const { findings, ruleCount, suppressed } = await runLint(dir, { disable });
+  let findings, ruleCount, suppressed;
+  try {
+    ({ findings, ruleCount, suppressed } = await runLint(dir, { disable }));
+  } catch (e) {
+    // Match check-coverage.mjs's own contract (exit 2, usage error) for the
+    // same failure -- an unhandled ENOENT here previously crashed with a raw
+    // stack trace at exit 1, which the documented README table reserves for
+    // "the gate failed" (real findings), not "couldn't read the directory".
+    console.error(`Error: cannot read directory — ${e.message}`);
+    process.exit(2);
+  }
   printLintResults(findings, ruleCount, suppressed);
   const failIdx = process.argv.indexOf('--fail-on');
   const threshold = failIdx >= 0 ? process.argv[failIdx + 1] : 'high';
