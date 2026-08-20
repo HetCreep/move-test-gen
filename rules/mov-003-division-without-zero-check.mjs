@@ -35,6 +35,7 @@ export function check(source, filename) {
   let inFunction = false;
   let fnStartLine = 0;
   let braceDepth = 0;
+  let seenOpenBrace = false;
   let fnLines = [];
   let isTestFn = false;
 
@@ -61,14 +62,21 @@ export function check(source, filename) {
       fnStartLine = i;
       fnLines = [];
       braceDepth = 0;
+      seenOpenBrace = false;
     }
 
     if (inFunction) {
       fnLines.push({ text: trimmed, lineNo: i + 1 });
-      braceDepth += (line.match(/{/g) || []).length;
-      braceDepth -= (line.match(/}/g) || []).length;
+      const opens = (line.match(/{/g) || []).length;
+      const closes = (line.match(/}/g) || []).length;
+      braceDepth += opens - closes;
+      if (opens > 0) seenOpenBrace = true;
 
-      if (braceDepth <= 0 && fnLines.length > 1) {
+      // `braceDepth <= 0` is trivially true before the function's own `{`
+      // has even been seen (a multi-line signature sits at depth 0 the
+      // whole time) -- require seenOpenBrace so we only end on braces
+      // actually closing back down, never on an opening that hasn't happened.
+      if (seenOpenBrace && braceDepth <= 0) {
         // function ended — analyze it
         analyzeFn(fnLines, filename, findings);
         inFunction = false;
