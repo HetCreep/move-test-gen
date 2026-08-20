@@ -390,6 +390,10 @@ function runMutations(packageDir, sourceDir, scopeFilter) {
     cleanup();
   }
 
+  // Carried on the array (not a separate return value) so every existing
+  // caller check -- `=== null`, `.length`, `.filter(...)` -- keeps working
+  // unchanged; only the one site that needs the timeout has to know it's here.
+  results.mutantTimeout = mutantTimeout;
   return results;
 }
 
@@ -603,7 +607,7 @@ if (doMutate) {
       const { candidates } = identifyProbeCandidates(mutResults, allAsserts);
 
       const probeOutcomes = candidates.map(c => {
-        const probed = runJointMutant(packageDir, sourceDir, c, mutantTimeout);
+        const probed = runJointMutant(packageDir, sourceDir, c, mutResults.mutantTimeout);
         return { ...c, jointKilled: probed };
       });
 
