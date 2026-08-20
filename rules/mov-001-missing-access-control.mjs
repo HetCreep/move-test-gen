@@ -51,11 +51,32 @@ export function check(source, filename) {
       const startMatch = trimmed.match(/^public(?:\s*\((?:package|friend)\))?\s+(?:entry\s+)?fun\s+(\w+)(?:<[^>]*>)?\s*\(/);
       if (startMatch) {
         let params = '';
+        let parenDepth = 0;
+        let seenOpenParen = false;
         for (let j = i; j < Math.min(i + 10, lines.length); j++) {
-          params += lines[j];
-          if (lines[j].includes(')')) break;
+          // Strip trailing comments per accumulated line -- otherwise a
+          // comment mentioning "Cap" (e.g. "// AdminCap checked upstream")
+          // gets matched by hasCap's regex below as if it were a real
+          // capability parameter, silencing a genuinely unguarded function.
+          const codeOnly = lines[j].replace(/\/\/.*$/, '');
+          params += codeOnly + '\n';
+          // Track real paren depth rather than stopping at the first `)` --
+          // a `public(package)`/`public(friend)` prefix closes its OWN paren
+          // before the parameter list's opening paren is even reached, so
+          // "any )" stops accumulation one line too early and the real
+          // parameter list (and the closing `)` fullMatch needs) is never
+          // captured at all.
+          const opens = (codeOnly.match(/\(/g) || []).length;
+          const closes = (codeOnly.match(/\)/g) || []).length;
+          parenDepth += opens - closes;
+          if (opens > 0) seenOpenParen = true;
+          if (seenOpenParen && parenDepth <= 0) break;
         }
-        const fullMatch = params.match(/public\s+(?:entry\s+)?fun\s+(\w+)(?:<[^>]*>)?\s*\(([^)]*)\)/);
+        // Same visibility-modifier alternative as the primary regex above --
+        // without it, a wrapped `public(package) fun`/`public(friend) fun`
+        // signature never matches here and the function is silently never
+        // checked at all (contradicts CHANGELOG.md's public(package) claim).
+        const fullMatch = params.match(/public(?:\s*\((?:package|friend)\))?\s+(?:entry\s+)?fun\s+(\w+)(?:<[^>]*>)?\s*\(([^)]*)\)/);
         if (fullMatch) {
           checkFunction(fullMatch[1], fullMatch[2], i + 1, filename, findings, isTestOnly);
         }
