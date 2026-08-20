@@ -104,8 +104,18 @@ function checkFunction(name, params, lineNo, filename, findings, isTestOnly) {
   const hasCap = /[A-Z]\w*Cap\b|\bCap\b|[A-Z]\w*Key\b|\bKey\b/.test(params);
   if (hasCap) return;
 
-  // does it have a witness parameter that implies auth?
-  const hasWitness = /Witness\b/.test(params) || /\bkey\s*:\s*\w+|\b_key\s*:\s*\w+/.test(params);
+  // does it have a witness parameter that implies auth? A `key`/`_key`
+  // param only counts when its TYPE isn't a plain Move primitive -- a
+  // generic type parameter (the `_key: T` pattern the selftest pins,
+  // where only a caller holding a real `T` value can pass one) carries
+  // some signal, but `key: u64`/`_key: bool`/etc name the type outright
+  // and provide none: any caller can write a literal. Previously any
+  // type at all exempted the function purely because the param was
+  // named `key`/`_key`.
+  const PRIMITIVE_PARAM_TYPES = /^(u8|u16|u32|u64|u128|u256|bool|address|signer|vector)\b/;
+  const keyParamMatch = params.match(/\b_?key\s*:\s*(\w+)/);
+  const hasWitness = /Witness\b/.test(params) ||
+    (keyParamMatch !== null && !PRIMITIVE_PARAM_TYPES.test(keyParamMatch[1]));
   if (hasWitness) return;
 
   // does it have a Version/VersionGate parameter (contract version check as access gate)?
