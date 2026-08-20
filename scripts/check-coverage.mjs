@@ -749,7 +749,14 @@ if (jsonPath) {
     coverage: {
       covered: covered.length,
       total: targetAsserts.length,
-      percent: coverageScore,
+      // null, not 100, when there was nothing to measure -- matches the
+      // console's own "n/a" branch above. A machine reader (the Action's
+      // coverage-percent output, a dashboard) that only sees the number
+      // cannot tell "100% covered" from "zero measurable sites" otherwise
+      // (GHSA-w7pc fixed this for the console text; this JSON field, and
+      // the Action output that reads directly from it, still published
+      // a bare 100).
+      percent: targetAsserts.length > 0 ? coverageScore : null,
       unpaired: unpaired.map(a => ({
         file: a.file, line: a.line, code: a.code, type: a.type,
       })),
