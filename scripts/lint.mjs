@@ -178,7 +178,14 @@ export async function runLint(sourcesDir, options = {}) {
           suppressed++;
           continue;
         }
-        allFindings.push(finding);
+        // Normalize once, here, so every downstream consumer (the reporter's
+        // severity buckets, shouldFail's threshold comparison) can compare
+        // against SEVERITY_ORDER/bySeverity's uppercase keys directly.
+        // validateRule already requires meta.severity to be one of
+        // VALID_SEVERITIES case-insensitively -- a rule declaring
+        // `severity: 'high'` loaded clean but printed as INFO and could
+        // never fail the gate, since neither consumer normalized case.
+        allFindings.push({ ...finding, severity: String(finding.severity).toUpperCase() });
       }
     }
   }
