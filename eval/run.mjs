@@ -132,7 +132,11 @@ function runGate(scenarioDir, { mutate, scope }) {
     findings: [],
   };
 
-  for (const m of out.matchAll(/^\s{2}(\S+):(\d+)\s+(assert|abort)\s+(\w+)\s*$/gm)) {
+  // "unparsed" is a third real type (GHSA-w7pc's fix: an assert! the tool
+  // can see but can't read a code from is reported unpaired too, not
+  // dropped) -- without it here, that exact failure mode is invisible to
+  // every round record this lab produces.
+  for (const m of out.matchAll(/^\s{2}(\S+):(\d+)\s+(assert|abort|unparsed)\s+(\w+)\s*$/gm)) {
     parsed.findings.push(`unpaired:${m[4]}@${normPath(m[1])}:${m[2]}`);
   }
   for (const m of out.matchAll(/^\s{2}✗\s+(\S+):(\d+)\s+\[([\w-]+)\]/gm)) {
