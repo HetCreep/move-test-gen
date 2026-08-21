@@ -124,7 +124,7 @@ node scripts/lint.mjs ./sources
 
 ## What this proves — and what it doesn't
 
-The coverage checker is a deterministic floor: it proves every assert has a matching `#[expected_failure]` test, that generated tests compile, and (with `--mutate`) that the suite actually catches injected bugs. It does **not** prove a test asserts the right thing — that judgment stays with the reviewer.
+The coverage checker is a deterministic floor: it proves every assert has a matching `#[expected_failure]` test, and (with `--mutate`) that the generated tests actually compile and that the suite catches injected bugs. It does **not** prove a test asserts the right thing — that judgment stays with the reviewer.
 
 > "Never let the floor pretend to be the ceiling."
 > — [HetCreep](https://github.com/TheColliery/CoalWash), who framed this better than I could.
