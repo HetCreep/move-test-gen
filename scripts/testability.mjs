@@ -60,7 +60,10 @@ export function checkTestability(source, moduleName) {
   const unconstructible = structNames.filter(s => !constructors.has(s));
 
   // check if any public function takes these unconstructible types as params
-  const publicFns = [...source.matchAll(/public\s+fun\s+(\w+)\(([^)]*)\)/g)];
+  // (?:<[^>]*>)? -- a generic function's name is followed by <T>, not
+  // directly by (; without this, `public fun withdraw<T>(...)` never
+  // matched at all, so every generic public function was invisible here.
+  const publicFns = [...source.matchAll(/public\s+fun\s+(\w+)(?:<[^>]*>)?\(([^)]*)\)/g)];
   for (const [, fnName, params] of publicFns) {
     for (const s of unconstructible) {
       if (params.includes(s) && !params.includes(`&${s}`) && fnName !== 'destroy' && !fnName.includes('testing')) {
