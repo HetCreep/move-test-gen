@@ -691,7 +691,18 @@ if (unpaired.length === 0) {
 // Security lint (optional)
 if (doLint) {
   const { runLint, printLintResults, shouldFail } = await import('./lint.mjs');
-  const { findings, ruleCount, suppressed } = await runLint(sourceDir, { disable: disabledRules });
+  // runLint() throws for an unreadable sources dir AND for a malformed rule
+  // file (validateRule()) -- either way this is a config/usage problem, not
+  // a lint verdict, and must not crash uncaught into Node's default exit 1,
+  // the code this tool's own contract reserves for "the gate failed" (real
+  // findings).
+  let findings, ruleCount, suppressed;
+  try {
+    ({ findings, ruleCount, suppressed } = await runLint(sourceDir, { disable: disabledRules }));
+  } catch (e) {
+    console.error(`Error: lint could not run — ${e.message}`);
+    process.exit(EXIT_USAGE);
+  }
   printLintResults(findings, ruleCount, suppressed);
   lintReport = {
     ruleCount,
