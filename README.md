@@ -233,7 +233,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: talongate/move-test-gen@v1.5.1
+      - uses: talongate/move-test-gen@v1.5.2
         with:
           sources: sources
           tests: tests

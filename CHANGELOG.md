@@ -5,6 +5,22 @@ Notable changes per released tag. Dates are the tag's commit date.
 Generated from `git log` between tags — if an entry looks wrong, the commit
 history is the source of truth.
 
+## v1.5.2 — 2026-08-21
+
+Community audit round 2 — 25 fixes from @HetCreep's CoalBoard nasa-rigor review.
+
+### Fixes
+
+- **Lint rules:** MOV-001 wrapped-signature fallback + key/witness type check; MOV-003 guard ordering + capture window; MOV-005 overbroad safe-context + Move 2024 `let mut`; MOV-006 abort-code regex comma
+- **Parser:** block-comment apostrophe handling; trailing comment stripping before cast/mul/div
+- **Mutation:** timeout scope at joint probe; timed-out mutants excluded from probe candidates
+- **Coverage:** 0/0 assert = null (not 100%) in JSON + Action output
+- **Lint infra:** `#[test_only]` scope per-module (not per-file); severity normalized at collection; CLI exit-code contract; uncaught malformed-rule crash guard
+- **Eval:** round-key parser recognizes unparsed asserts; doctor catches unpinned dependencies
+- **Testability:** generic public functions recognized
+- **Docs:** README claim scoped to --mutate; template name/assertion sync; truncated words restored; bare npm name warning; selftest case count synced
+- **Examples:** action pins updated to talongate post-transfer
+
 ## v1.5.1 — 2026-08-16
 
 Security patch. Fixes GHSA-w7pc-q6qh-49qw, which was declared fixed in v1.5.0 but was not.
