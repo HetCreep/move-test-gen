@@ -19,7 +19,15 @@ const RULE_ID = 'MOV-006';
 const SEVERITY = 'LOW';
 const TITLE = 'abort code shared across multiple public functions';
 
-const ASSERT_RE = /assert!\s*\([^,]+,\s*(\w+)\s*\)/g;
+// [^,]+ for the condition stops at the FIRST comma -- wrong whenever the
+// condition itself contains one, which a nested multi-arg call does all the
+// time (`assert!(table::contains(t, k), E_CODE)`): it captured `k`, the
+// call's own second argument, as if it were the abort code. check-coverage.mjs
+// already solved this the same way real Move parses it -- greedy across the
+// whole condition, so backtracking lands on the LAST comma, the assert's own
+// -- and additionally tolerates a parenthesised code and a trailing comma
+// (both valid Move, both introduced by the GHSA-w7pc fix). Matched here too.
+const ASSERT_RE = /assert!\s*\(.*,\s*\(?\s*(\w+)\s*\)?\s*,?\s*\)/g;
 const FUN_RE = /^\s*(public\s+(?:entry\s+)?fun|entry\s+fun|public\s*\(friend\)\s+fun|public\s*\(package\)\s+fun)\s+(\w+)/;
 const TEST_ATTR_RE = /^\s*#\[test/;
 const TEST_ONLY_ATTR_RE = /^\s*#\[test_only\]/;
