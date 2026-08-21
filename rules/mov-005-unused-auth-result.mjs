@@ -39,7 +39,11 @@ const AUTH_PATTERNS = [
 
 const SAFE_CONTEXTS = [
   /assert!\s*\(/,
-  /\blet\s+[a-zA-Z]\w*\s*=/,
+  // (?:mut\s+)? -- Move 2024's `let mut x = ...` puts the `mut` keyword
+  // between `let` and the bound name; without tolerating it, the pattern
+  // required `=` right after `let`'s first identifier and never matched
+  // `let mut x = ...` at all, flagging a properly-bound result as discarded.
+  /\blet\s+(?:mut\s+)?[a-zA-Z]\w*\s*=/,
   /\bif\s*[\s(]/,
   /\bwhile\s*\(/,
   /\breturn\b/,
