@@ -12,7 +12,7 @@ is that "what gets tagged and when" stops living only in the maintainer's head.
 2. `node eval/run.mjs doctor` is all clear — the CLI version matches the rev
    each scenario's `Move.toml` pins.
 3. `package.json` `version` is the version you are about to tag.
-4. `CHANGELOG.md` has a section for it. The **Unreleased** entries move unde
+4. `CHANGELOG.md` has a section for it. The **Unreleased** entries move under
    the new heading.
 
 ## Tagging
@@ -27,7 +27,7 @@ is that "what gets tagged and when" stops living only in the maintainer's head.
    nothing catches it. Commit `7daae46` aligned them once; they went stale again
    at the next release.
 
-## Afte
+## After tagging
 
 7. If the release contains a security fix, the advisory for it can be published
    now that a fixed version exists to point at.
