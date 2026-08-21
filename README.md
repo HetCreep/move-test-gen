@@ -36,6 +36,13 @@ npx skills add talongate/move-test-gen
 > run `npx.cmd skills add talongate/move-test-gen` instead (stock PowerShell
 > default, not a skill issue).
 
+> **Always keep the `talongate/` prefix.** The bare package name
+> (`npx move-test-gen`, without an owner) resolves to a placeholder on the
+> npm registry that predates every security fix in this repo's history —
+> it exists only so the name isn't squatted, and its own description still
+> points at the pre-transfer org name. Every command on this page uses the
+> full `talongate/move-test-gen` form on purpose; don't shorten it.
+
 Or manually place it in your Claude Code environment:
 
 ```
