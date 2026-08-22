@@ -37,6 +37,21 @@ const TEST_ONLY_ATTR_RE = /^\s*#\[test_only\]/;
  * @param {string} filename
  * @returns {Array<{rule, severity, file, line, message}>}
  */
+function collectAsserts(trimmed, fn, lineNo, codeUsage) {
+  ASSERT_RE.lastIndex = 0;
+  let m;
+  while ((m = ASSERT_RE.exec(trimmed)) !== null) {
+    const code = m[1].trim();
+    // skip pure numeric 0 (common placeholder)
+    if (code === '0') continue;
+    // skip lowercase single words that look like variables, not error constants
+    // abort codes are typically UPPER_CASE, EErrorName, or numeric
+    if (/^[a-z][a-z_]*$/.test(code) && !code.startsWith('e_')) continue;
+    if (!codeUsage.has(code)) codeUsage.set(code, []);
+    codeUsage.get(code).push({ fn, line: lineNo });
+  }
+}
+
 export function check(source, filename) {
   const findings = [];
   const lines = source.split('\n');
@@ -62,7 +77,12 @@ export function check(source, filename) {
       continue;
     }
 
-    // track braces
+    // track braces -- remember the depth BEFORE this line's own braces so a
+    // single-line function body ("public fun f() { assert!(...); }") can be
+    // told apart from a signature line that only OPENS the body. A netted
+    // per-line delta alone can't tell them apart: both end the line at the
+    // same depth they started, once open+close on one line cancel out.
+    const braceDepthBeforeLine = braceDepth;
     for (const ch of trimmed) {
       if (ch === '{') braceDepth++;
       if (ch === '}') braceDepth--;
@@ -95,6 +115,15 @@ export function check(source, filename) {
       skipNextItem = false;
       currentFn = fnMatch[2];
       fnBraceStart = braceDepth;
+      // Single-line body: this line's own brace delta closed back to (or
+      // below) where it started, so braceDepth never reflects "inside the
+      // function" and no later line will ever trip the function-end check
+      // below. Collect this line's asserts right now, under this function,
+      // then close it immediately.
+      if (braceDepth <= braceDepthBeforeLine) {
+        collectAsserts(trimmed, currentFn, i + 1, codeUsage);
+        currentFn = null;
+      }
       continue;
     }
 
@@ -108,18 +137,7 @@ export function check(source, filename) {
     if (!currentFn) continue;
 
     // collect abort codes from assert! statements
-    ASSERT_RE.lastIndex = 0;
-    let m;
-    while ((m = ASSERT_RE.exec(trimmed)) !== null) {
-      const code = m[1].trim();
-      // skip pure numeric 0 (common placeholder)
-      if (code === '0') continue;
-      // skip lowercase single words that look like variables, not error constants
-      // abort codes are typically UPPER_CASE, EErrorName, or numeric
-      if (/^[a-z][a-z_]*$/.test(code) && !code.startsWith('e_')) continue;
-      if (!codeUsage.has(code)) codeUsage.set(code, []);
-      codeUsage.get(code).push({ fn: currentFn, line: i + 1 });
-    }
+    collectAsserts(trimmed, currentFn, i + 1, codeUsage);
   }
 
   // find codes used in 2+ different functions
