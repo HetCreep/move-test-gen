@@ -77,28 +77,43 @@ function extractFunctions(lines) {
   const functions = [];
   let i = 0;
 
+  // An attribute belongs to the item it is directly attached to, never to
+  // whatever function happens to follow within N lines. These flags carry
+  // an attribute across blank lines, comments, and stacked attribute lines
+  // (none of which are items of their own) but are cleared the instant we
+  // reach an actual item -- `use`, `struct`, `const`, or a `fun` that
+  // consumes them. That is the only way an attribute is "attached": nothing
+  // but pass-through lines between it and its item.
+  let pendingTestOnly = false;
+  let pendingTest = false;
+
   while (i < lines.length) {
     const trimmed = lines[i].trim();
 
-    // detect test attributes
-    let isTestOnly = false;
-    let isTest = false;
-    if (/^#\[test_only\]/.test(trimmed)) { isTestOnly = true; i++; continue; }
-    if (/^#\[test[\],\s]/.test(trimmed)) { isTest = true; }
+    if (trimmed === '' || trimmed.startsWith('//')) { i++; continue; }
 
-    // detect function start
+    // A line that is ONLY an attribute (no same-line item) -- carry its
+    // flag forward and keep scanning for the item it decorates.
+    const attrOnly = trimmed.match(/^#\[([^\]]*)\]$/);
+    if (attrOnly) {
+      if (/^test_only\b/.test(attrOnly[1])) pendingTestOnly = true;
+      else if (/^test\b/.test(attrOnly[1])) pendingTest = true;
+      // any other attribute (#[allow(...)], #[expected_failure(...)]) is
+      // just another line stacked above the same item -- leave flags as-is.
+      i++;
+      continue;
+    }
+
+    // detect function start -- tolerates a leading same-line attribute
+    // (`#[test_only] fun helper() {`), see parseFunctionSignature.
     const fnInfo = parseFunctionSignature(lines, i);
     if (fnInfo) {
-      // inherit test flags from preceding attributes
-      if (isTestOnly) fnInfo.isTestOnly = true;
-      if (isTest) fnInfo.isTest = true;
-
-      // check previous lines for test attributes
-      for (let j = Math.max(0, i - 3); j < i; j++) {
-        const prev = lines[j].trim();
-        if (/^#\[test_only\]/.test(prev)) fnInfo.isTestOnly = true;
-        if (/^#\[test[\],\s]/.test(prev)) fnInfo.isTest = true;
-      }
+      if (/^#\[test_only\]/.test(trimmed)) fnInfo.isTestOnly = true;
+      if (/^#\[test[\],\s]/.test(trimmed)) fnInfo.isTest = true;
+      if (pendingTestOnly) fnInfo.isTestOnly = true;
+      if (pendingTest) fnInfo.isTest = true;
+      pendingTestOnly = false;
+      pendingTest = false;
 
       // find function body boundaries
       const bodyRange = findBraceBlock(lines, fnInfo.sigEndLine);
@@ -112,9 +127,11 @@ function extractFunctions(lines) {
       }
     }
 
-    // reset test flags if no function followed
-    isTestOnly = false;
-    isTest = false;
+    // Reached a different item (use/struct/const, an unmatched fun, or any
+    // other code) -- any pending attribute belonged to THIS item, not to
+    // whatever function comes later, so it does not carry any further.
+    pendingTestOnly = false;
+    pendingTest = false;
     i++;
   }
 
@@ -124,9 +141,14 @@ function extractFunctions(lines) {
 function parseFunctionSignature(lines, startIdx) {
   const line = lines[startIdx].trim();
 
+  // Strip a leading same-line attribute (`#[test_only] fun foo() {`) so the
+  // signature regex still anchors correctly. The stripped prefix has no
+  // parens/braces, so it never disturbs the raw-line scans further down.
+  const sigLine = line.replace(/^(?:#\[[^\]]*\]\s*)+/, '');
+
   // match function declaration
   const fnRegex = /^(public\s+entry\s+|public\(friend\)\s+|public\(package\)\s+|public\s+|entry\s+)?fun\s+(\w+)(?:<([^>]*)>)?\s*\(/;
-  const m = line.match(fnRegex);
+  const m = sigLine.match(fnRegex);
   if (!m) return null;
 
   const visRaw = (m[1] || '').trim();
