@@ -128,8 +128,9 @@ function checkFunction(name, params, lineNo, filename, findings, isTestOnly) {
   if (hasUserAsset) return;
 
   // does it only mutate a user-owned token/NFT (self-modification pattern)?
+  // word boundaries prevent "PositionManager" (shared object) from matching "Position" (user-owned NFT)
   const mutParams = params.match(/&mut\s+(?!TxContext)(?!tx_context)\w+/g) || [];
-  const onlySelfMut = mutParams.every(p => /Token|NFT|Ticket|Receipt|Position/.test(p));
+  const onlySelfMut = mutParams.every(p => /\bToken\b|\bNFT\b|\bTicket\b|\bReceipt\b|\bPosition\b/.test(p));
   if (onlySelfMut && mutParams.length > 0) return;
 
   findings.push({

@@ -21,9 +21,29 @@ const cases = [
   ['withdraw_all',    true,  'ordinary public fun, must be flagged'],
 ];
 
+// word-boundary regression: "PositionManager" (shared object) was falsely
+// exempt because /Position/ matched as a substring — only exact "Position"
+// (user-owned NFT) should be exempt
+const managerBody = '(pm: &mut PositionManager, amount: u64) { }';
+const positionBody = '(pos: &mut Position, amount: u64) { }';
+const wbCases = [
+  ['spec_call_pull',  managerBody, true,  'PositionManager is a shared object, must be flagged'],
+  ['rebalance',       positionBody, false, 'Position (exact) is a user-owned NFT, exempt'],
+];
+
 let failed = 0;
 for (const [name, shouldFlag, why] of cases) {
   const src = `module demo::m {\n    public fun ${name}${body}\n}\n`;
+  const findings = check(src, 'demo.move').filter(f => f.rule === 'MOV-001');
+  const flagged = findings.length > 0;
+  if (flagged !== shouldFlag) {
+    failed++;
+    console.log(`  ${name}: expected ${shouldFlag ? 'FLAGGED' : 'exempt'}, got ${flagged ? 'FLAGGED' : 'exempt'} — ${why}`);
+  }
+}
+
+for (const [name, body2, shouldFlag, why] of wbCases) {
+  const src = `module demo::m {\n    public fun ${name}${body2}\n}\n`;
   const findings = check(src, 'demo.move').filter(f => f.rule === 'MOV-001');
   const flagged = findings.length > 0;
   if (flagged !== shouldFlag) {
@@ -36,5 +56,5 @@ if (failed) {
   console.log(`${failed} exemption(s) changed behaviour`);
   process.exit(1);
 }
-console.log('MOV-001 exemption list unchanged');
+console.log('MOV-001 exemption list unchanged (incl. word-boundary fix)');
 process.exit(0);
