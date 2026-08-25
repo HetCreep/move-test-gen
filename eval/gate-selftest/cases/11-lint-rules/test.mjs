@@ -1,6 +1,6 @@
 /**
  * Selftest for lint rules — synthetic Move source, no sui needed.
- * Tests all 6 rules: MOV-001 through MOV-006.
+ * Tests all 7 rules: MOV-001 through MOV-006 + MOV-011.
  * Each new skip pattern gets a pin here BEFORE the rule ships.
  */
 import { check as check001 } from '../../../../rules/mov-001-missing-access-control.mjs';
@@ -407,6 +407,29 @@ assert('MOV-006: severity LOW', r006a[0].severity === 'LOW');
 
 assert('MOV-006: passes with unique codes', check006(unique_abort, 'registry.move').length === 0);
 assert('MOV-006: skips lowercase variable names', check006(variable_abort, 'pool.move').length === 0);
+
+// ── MOV-011: public(package) entry bypass ────────────────────────────
+
+import { check as check011 } from '../../../../rules/mov-011-package-entry-bypass.mjs';
+
+const pkg_entry_unsafe = `
+module example::admin {
+    public(package) entry fun reset_pool(pool: &mut Pool) { }
+}`;
+
+const pkg_no_entry = `
+module example::admin {
+    public(package) fun internal_reset(pool: &mut Pool) { }
+}`;
+
+const public_entry_ok = `
+module example::admin {
+    public entry fun normal_entry(ctx: &mut TxContext) { }
+}`;
+
+assert('MOV-011: flags public(package) entry', check011(pkg_entry_unsafe, 'admin.move').length === 1);
+assert('MOV-011: passes public(package) without entry', check011(pkg_no_entry, 'admin.move').length === 0);
+assert('MOV-011: passes plain public entry', check011(public_entry_ok, 'admin.move').length === 0);
 
 // ── Summary ──────────────────────────────────────────────────────────
 
