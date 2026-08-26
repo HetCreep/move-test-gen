@@ -1,6 +1,6 @@
 /**
  * Selftest for lint rules — synthetic Move source, no sui needed.
- * Tests all 7 rules: MOV-001 through MOV-006 + MOV-011.
+ * Tests all 8 rules: MOV-001 through MOV-006 + MOV-011 + MOV-012.
  * Each new skip pattern gets a pin here BEFORE the rule ships.
  */
 import { check as check001 } from '../../../../rules/mov-001-missing-access-control.mjs';
@@ -430,6 +430,29 @@ module example::admin {
 assert('MOV-011: flags public(package) entry', check011(pkg_entry_unsafe, 'admin.move').length === 1);
 assert('MOV-011: passes public(package) without entry', check011(pkg_no_entry, 'admin.move').length === 0);
 assert('MOV-011: passes plain public entry', check011(public_entry_ok, 'admin.move').length === 0);
+
+// ── MOV-012: sender as address parameter ─────────────────────────────
+
+import { check as check012 } from '../../../../rules/mov-012-sender-as-address-param.mjs';
+
+const sender_unsafe = `
+module example::vault {
+    public fun withdraw(sender: address, amount: u64) { }
+}`;
+
+const sender_safe_ctx = `
+module example::vault {
+    public fun withdraw(amount: u64, ctx: &mut TxContext) { }
+}`;
+
+const sender_safe_destination = `
+module example::vault {
+    public fun transfer(to: address, amount: u64) { }
+}`;
+
+assert('MOV-012: flags sender: address', check012(sender_unsafe, 'vault.move').length === 1);
+assert('MOV-012: passes ctx-based auth', check012(sender_safe_ctx, 'vault.move').length === 0);
+assert('MOV-012: passes to: address (destination)', check012(sender_safe_destination, 'vault.move').length === 0);
 
 // ── Summary ──────────────────────────────────────────────────────────
 
