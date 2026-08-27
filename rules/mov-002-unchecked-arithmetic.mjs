@@ -3,14 +3,16 @@
  *
  * Two sub-checks:
  *   (a) Multiplication of u64 values without prior cast to u128/u256.
- *   (b) Bit-shift operations (<< >>) which silently wrap on overflow
- *       instead of aborting like + - *.
+ *   (b) Left shift (<<), which silently discards the high bits on
+ *       overflow instead of aborting like + - *. Right shift (>>) is
+ *       deliberately NOT flagged: it discards low bits by design
+ *       (unscaling, division-by-power-of-two) and cannot overflow.
  *
  * Why it matters: The Cetus $223M exploit root cause was an incorrect
- * overflow check on a shift operation. Kriya had the identical bug.
+ * overflow check on a LEFT shift operation. Kriya had the identical bug.
  * Any u64 * u64 that could exceed 2^64 needs u128 promotion BEFORE
- * the multiplication, not after. Bit-shifts are worse — they don't
- * abort at all, they silently lose the high bits.
+ * the multiplication, not after. A left shift is worse — it doesn't
+ * abort at all, it silently loses the high bits.
  *
  * Uses the Move parser for type tracking: if either operand is known
  * to be u128 or u256 (from let declaration, cast, or naming convention),
@@ -76,7 +78,23 @@ export function check(source, filename) {
     }
   }
 
-  // (b) Bit-shift detection — << and >> silently wrap on overflow
+  // (b) Bit-shift detection — `<<` silently discards the HIGH bits on
+  // overflow with no abort, the same shift-side hazard as the Cetus
+  // checked_shlw bug this rule's docstring cites (an incorrectly-checked
+  // LEFT shift). `>>` is deliberately NOT flagged: a right shift discards
+  // LOW bits by design (fixed-point unscaling, division-by-power-of-two)
+  // and cannot overflow or "wrap" the way `<<`/`*` can -- the previous
+  // message ("silently wraps on overflow") was simply false for `>>`, and
+  // a rule that asserts something false teaches users to ignore it. This
+  // also removes `>>`'s single largest false-positive source as a
+  // consequence, not as a separate fix: two closing generic type brackets
+  // (`vector<vector<u8>>`) produce a literal `>>` with no shift anywhere
+  // nearby, and nested-generic-heavy Move code (VecMap/VecSet/vector of
+  // vector) hit this constantly. `<<` has no equivalent ambiguity --
+  // Move's generic syntax only ever OPENS with a single `<` (an
+  // identifier always separates two nested opens, e.g. `A<B<C>>`), so a
+  // literal `<<` is unambiguously a real left-shift operator and needs no
+  // "is this actually a shift" guard.
   const lines = source.split('\n');
   let inTestBlock = false;
   let inTestOnlyModule = false;
@@ -92,24 +110,23 @@ export function check(source, filename) {
     }
     if (inTestBlock || inTestOnlyModule) continue;
 
-    // detect << or >> on non-literal, non-const lines
-    if (/(<<|>>)/.test(trimmed)) {
-      // skip if line is a const declaration
+    // detect << anywhere on the line, single-line function body included
+    // -- a signature-plus-body line (`fun f(a: u64): u64 { a << b }`) is
+    // not "just a type annotation" just because a `: uNN` also appears on
+    // it earlier in the same line.
+    if (trimmed.includes('<<')) {
+      // skip if line is a const declaration (compile-time, no runtime risk)
       if (/const\s+\w+/.test(trimmed)) continue;
-      // skip if inside a comment (already handled above)
       // skip if operand is already u128/u256
       if (/as\s+u128/.test(trimmed) || /as\s+u256/.test(trimmed)) continue;
-      if (/u128\s*(<<|>>)/.test(trimmed) || /u256\s*(<<|>>)/.test(trimmed)) continue;
-      // skip if this is a type annotation or generic, not arithmetic
-      if (/:\s*u\d+\s*[,)]/.test(trimmed) && !/(<<|>>)/.test(trimmed.split(':')[0])) continue;
+      if (/u128\s*<</.test(trimmed) || /u256\s*<</.test(trimmed)) continue;
 
-      const op = trimmed.includes('<<') ? '<<' : '>>';
       findings.push({
         rule: RULE_ID,
         severity: SEVERITY,
         file: filename,
         line: i + 1,
-        message: `bit-shift \`${op}\` silently wraps on overflow — unlike +/-/*, shifts do NOT abort; validate the shift amount or cast to a wider type first`,
+        message: `bit-shift \`<<\` silently discards the high bits on overflow — unlike +/-/*, a left shift does NOT abort; validate the shift amount and operand width or cast to a wider type first`,
       });
     }
   }

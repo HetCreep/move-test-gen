@@ -1,0 +1,5 @@
+{
+  "note": "MOV-002's bit-shift check must fire on a single-line << body (Cetus-class fail-open), must not fire on >> that is closing generics (the corpus false-positive source), and must not assert a false claim about right shift",
+  "type": "script",
+  "script": "test.mjs"
+}
