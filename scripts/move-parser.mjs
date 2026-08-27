@@ -11,6 +11,8 @@
  * ask "what type is this variable?" without regex guessing.
  */
 
+import { stripBlockComments } from './strip-comments.mjs';
+
 export const WIDE_TYPES = new Set(['u128', 'u256']);
 
 /**
@@ -19,8 +21,15 @@ export const WIDE_TYPES = new Set(['u128', 'u256']);
  * @returns {{ moduleName: string, functions: ParsedFunction[], constants: Constant[] }}
  */
 export function parseModule(source) {
-  const lines = source.split('\n');
-  const moduleName = extractModuleName(source);
+  // Strip block comments up front: a #[test_only]/#[test] attribute (or a
+  // const/module declaration) sitting inside a commented-out block is not
+  // attached to anything real, and extractFunctions()'s attribute
+  // pass-through would otherwise walk straight through a /* ... */ line
+  // (single- or multi-line) as if it were blank. stripBlockComments()
+  // preserves line count, so downstream line numbers stay correct.
+  const stripped = stripBlockComments(source);
+  const lines = stripped.split('\n');
+  const moduleName = extractModuleName(stripped);
   const constants = extractConstants(lines);
   const functions = extractFunctions(lines);
   return { moduleName, constants, functions };
@@ -93,8 +102,12 @@ function extractFunctions(lines) {
     if (trimmed === '' || trimmed.startsWith('//')) { i++; continue; }
 
     // A line that is ONLY an attribute (no same-line item) -- carry its
-    // flag forward and keep scanning for the item it decorates.
-    const attrOnly = trimmed.match(/^#\[([^\]]*)\]$/);
+    // flag forward and keep scanning for the item it decorates. A trailing
+    // `//` comment (`#[test_only] // helper used by the suite`) doesn't
+    // disqualify it -- strip that before checking, same idiom parseBody()
+    // already uses for the identical reason.
+    const attrCodeOnly = trimmed.replace(/\/\/.*$/, '').trim();
+    const attrOnly = attrCodeOnly.match(/^#\[([^\]]*)\]$/);
     if (attrOnly) {
       if (/^test_only\b/.test(attrOnly[1])) pendingTestOnly = true;
       else if (/^test\b/.test(attrOnly[1])) pendingTest = true;
@@ -142,8 +155,12 @@ function parseFunctionSignature(lines, startIdx) {
   const line = lines[startIdx].trim();
 
   // Strip a leading same-line attribute (`#[test_only] fun foo() {`) so the
-  // signature regex still anchors correctly. The stripped prefix has no
-  // parens/braces, so it never disturbs the raw-line scans further down.
+  // signature regex still anchors correctly. A stripped attribute CAN carry
+  // its own parens (`#[allow(lint(self_transfer))] public fun payout(...)`)
+  // -- the param-collector loop below uses this stripped line rather than
+  // the raw one for its own starting line, specifically so a balanced
+  // paren pair inside the attribute never gets mistaken for the real
+  // parameter list and truncates it early.
   const sigLine = line.replace(/^(?:#\[[^\]]*\]\s*)+/, '');
 
   // match function declaration
@@ -166,7 +183,11 @@ function parseFunctionSignature(lines, startIdx) {
   let depth = 0;
   let started = false;
   for (let j = startIdx; j < Math.min(startIdx + 15, lines.length); j++) {
-    for (const ch of lines[j]) {
+    // The starting line may carry a same-line attribute prefix with its own
+    // parens (see sigLine above) -- use the already-stripped text for it so
+    // those parens are never counted. Every later line has no such prefix.
+    const lineText = j === startIdx ? sigLine : lines[j];
+    for (const ch of lineText) {
       if (ch === '(') { depth++; started = true; }
       if (started && depth > 0) paramStr += ch;
       if (ch === ')') { depth--; if (started && depth === 0) { sigEndLine = j; break; } }

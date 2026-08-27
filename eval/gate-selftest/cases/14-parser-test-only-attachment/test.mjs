@@ -15,9 +15,23 @@
  * This pins both directions: the leak must not happen, AND a genuinely
  * test-only function -- multi-line or same-line attribute form -- must
  * still be exempt.
+ *
+ * The first version of this fix (attrOnly = /^#\[([^\]]*)\]$/, and a
+ * pass-through set of only blank/`//` lines) introduced two new false
+ * positives of its own: a trailing `//` comment on the attribute line broke
+ * the end-anchored regex, and a block-comment-only line between the
+ * attribute and its function wasn't in the pass-through set -- both broke
+ * the "attribute belongs to the item directly below it" chain and made a
+ * genuinely test-only function get flagged. Pinned below alongside a third,
+ * unrelated fix in the same commit: parseFunctionSignature()'s param
+ * collector used to scan the RAW same-line-attribute-prefixed text, so an
+ * attribute carrying its own balanced parens (`#[allow(lint(x))]`) could
+ * close the depth counter before the real parameter list was ever reached,
+ * silently dropping every parameter.
  */
 import { check as checkMov002 } from '../../../../rules/mov-002-unchecked-arithmetic.mjs';
 import { check as checkMov004 } from '../../../../rules/mov-004-unsafe-downcast.mjs';
+import { parseModule } from '../../../../scripts/move-parser.mjs';
 
 const errs = [];
 function assert(label, cond) {
@@ -88,6 +102,49 @@ module example::legit_sameline_use {
 assert(
   'a same-line "#[test_only] use ...;" must not leak onto the next function',
   checkMov002(legitSameLineUse, 'legit.move').length === 1
+);
+
+// ── false positive #1: trailing `//` comment on the attribute's own line ──
+const trailingComment = `
+module example::trailing_comment {
+    #[test_only] // helper used by the suite
+    public fun helper_mul(a: u64, b: u64): u64 {
+        a * b
+    }
+}`;
+assert(
+  'a #[test_only] line with a trailing // comment must still exempt the function below it',
+  checkMov002(trailingComment, 'legit.move').length === 0
+);
+
+// ── false positive #2: a block-comment-only line between attribute and fun ──
+const blockCommentBetween = `
+module example::block_comment_between {
+    #[test_only]
+    /* suite-only helper */
+    public fun helper_mul(a: u64, b: u64): u64 {
+        a * b
+    }
+}`;
+assert(
+  'a /* ... */ line between #[test_only] and its fun must not break the attachment',
+  checkMov002(blockCommentBetween, 'legit.move').length === 0
+);
+
+// ── param-collector: an attribute with its own balanced parens must not
+// ── truncate the real parameter list ──
+const attrWithParens = `
+module example::attr_with_parens {
+    public struct AdminCap has key { id: UID }
+    #[allow(lint(self_transfer))] public fun payout(cap: &AdminCap, a: u64, b: u64, c: u64) {
+        abort 0
+    }
+}`;
+const payout = parseModule(attrWithParens).functions.find(f => f.name === 'payout');
+assert(
+  'an attribute with its own parens must not truncate the real parameter list',
+  payout && payout.params.length === 4 &&
+  payout.params.map(p => p.name).join(',') === 'cap,a,b,c'
 );
 
 if (errs.length) {
