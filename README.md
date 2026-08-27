@@ -58,7 +58,7 @@ skills/
     │   ├── testability.mjs
     │   └── walk-dir.mjs
     ├── rules/
-    │   └── mov-00*.mjs          (all six, needed for --lint)
+    │   └── mov-*.mjs            (all nine, needed for --lint)
     └── references/
         └── patterns.md
 ```
@@ -111,11 +111,14 @@ node scripts/check-coverage.mjs ./sources ./tests --lint
 | Rule | Severity | What it catches |
 |------|----------|----------------|
 | **MOV-001** | HIGH | `public fun` with `&mut` but no capability, key, or witness parameter |
-| **MOV-002** | HIGH | `u64 * u64` without `u128` promotion before multiplication |
+| **MOV-002** | HIGH | `u64 * u64` without `u128` promotion before multiplication, or a `<<`/`>>` bit-shift that silently wraps on overflow |
 | **MOV-003** | MEDIUM | Division by a variable with no prior `assert!(x != 0, ...)` |
 | **MOV-004** | MEDIUM | `(expr as u64)` downcast from u128/u256 without overflow check |
 | **MOV-005** | HIGH | Bool-returning auth call (`vector::contains`, `has`, `is_authorized`) result discarded — authorization runs but is never enforced |
 | **MOV-006** | LOW | Same abort code used in `assert!` across 2+ public functions — callers cannot distinguish which function aborted |
+| **MOV-008** | MEDIUM | `assert!(payment == required)` exact-equality check on a caller-controlled amount — dust/rounding/fee-on-transfer breaks it; use `>=` instead |
+| **MOV-011** | HIGH | `public(package) entry` function — the `entry` modifier makes it callable via PTB from outside the package despite the `package` restriction |
+| **MOV-012** | HIGH | Sender/caller identity taken as a plain `address` parameter instead of `tx_context::sender(ctx)` — spoofable by any PTB caller |
 
 Rules are pure functions in `rules/*.mjs`. The engine skips `#[test_only]` modules and `#[test]` function bodies automatically. MOV-002 and MOV-004 use a lightweight Move parser (`scripts/move-parser.mjs`) to track variable types through declarations, casts, and naming conventions — if an operand is known u128/u256, the finding is suppressed instead of relying on suffix heuristics.
 
