@@ -5,6 +5,29 @@ Notable changes per released tag. Dates are the tag's commit date.
 Generated from `git log` between tags — if an entry looks wrong, the commit
 history is the source of truth.
 
+## v1.6.0 — 2026-08-26
+
+New lint rules and accuracy improvements. Three of the new checks were inspired by patterns documented in @pankajjangid's [sui-move-auditor](https://github.com/AlphaFiTech/sui-ai-commons) — the exact-equality payment assert, bit-shift silent wrapping, and sender-as-address spoofability. Credited because that's where the signal came from.
+
+### New rules
+
+- **MOV-008** [MEDIUM] — exact-equality assert on payment amounts (`assert!(amount == price)` → DoS via dust/rounding; use `>=` instead)
+- **MOV-011** [HIGH] — `public(package) entry` function is externally callable via PTB (the `entry` modifier defeats the package restriction)
+- **MOV-012** [HIGH] — sender identity taken as a plain `address` parameter instead of `tx_context::sender(ctx)` (spoofable by any PTB caller)
+
+### Extended rules
+
+- **MOV-002** now detects `<<` / `>>` bit-shift operations that silently wrap on overflow (unlike `+`/`-`/`*` which abort). Same class as the Cetus $223M checked_shlw root cause.
+
+### Fixes
+
+- **MOV-001** word-boundary fix — `PositionManager` (shared object) was falsely exempt because `/Position/` matched as a substring. Only exact `Position` (user-owned NFT) is now exempt.
+
+### Stats
+
+- Lint rules: 6 → 9 files (10 checks including MOV-002 shift extension)
+- gate-selftest: 14/14 cases green
+
 ## v1.5.2 — 2026-08-21
 
 Community audit round 2 — 25 fixes from @HetCreep's CoalBoard nasa-rigor review.

@@ -1,6 +1,6 @@
 {
   "name": "move-test-gen",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "description": "Coverage checker + security linter for Sui Move \u2014 assert pairing, mutation testing, 6 lint rules",
   "type": "module",
   "bin": {
