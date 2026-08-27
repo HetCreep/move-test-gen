@@ -111,7 +111,7 @@ node scripts/check-coverage.mjs ./sources ./tests --lint
 | Rule | Severity | What it catches |
 |------|----------|----------------|
 | **MOV-001** | HIGH | `public fun` with `&mut` but no capability, key, or witness parameter |
-| **MOV-002** | HIGH | `u64 * u64` without `u128` promotion before multiplication, or a `<<`/`>>` bit-shift that silently wraps on overflow |
+| **MOV-002** | HIGH | `u64 * u64` without `u128` promotion before multiplication, or a left shift (`<<`) that silently discards the high bits on overflow |
 | **MOV-003** | MEDIUM | Division by a variable with no prior `assert!(x != 0, ...)` |
 | **MOV-004** | MEDIUM | `(expr as u64)` downcast from u128/u256 without overflow check |
 | **MOV-005** | HIGH | Bool-returning auth call (`vector::contains`, `has`, `is_authorized`) result discarded — authorization runs but is never enforced |
