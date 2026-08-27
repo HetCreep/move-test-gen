@@ -1,14 +1,16 @@
 /**
- * MOV-002: Integer multiplication without overflow protection.
+ * MOV-002: Integer arithmetic without overflow protection.
  *
- * Flags multiplication of u64 values without prior cast to u128/u256.
- * The Move VM aborts on arithmetic overflow, but in some contexts
- * (bitwise shifts, checked_shlw patterns) overflow is silent.
+ * Two sub-checks:
+ *   (a) Multiplication of u64 values without prior cast to u128/u256.
+ *   (b) Bit-shift operations (<< >>) which silently wrap on overflow
+ *       instead of aborting like + - *.
  *
  * Why it matters: The Cetus $223M exploit root cause was an incorrect
  * overflow check on a shift operation. Kriya had the identical bug.
  * Any u64 * u64 that could exceed 2^64 needs u128 promotion BEFORE
- * the multiplication, not after.
+ * the multiplication, not after. Bit-shifts are worse — they don't
+ * abort at all, they silently lose the high bits.
  *
  * Uses the Move parser for type tracking: if either operand is known
  * to be u128 or u256 (from let declaration, cast, or naming convention),
@@ -61,7 +63,7 @@ export function check(source, filename) {
       if (/const\s+\w+\s*:\s*u\d+\s*=/.test(lineText)) continue;
       if (/:\s*u128\s*=/.test(lineText) || /:\s*u256\s*=/.test(lineText)) continue;
 
-      // skip shift operations
+      // skip lines that are shift operations (handled separately below)
       if (/<<|>>/.test(lineText)) continue;
 
       findings.push({
@@ -70,6 +72,44 @@ export function check(source, filename) {
         file: filename,
         line: mul.line,
         message: `${TITLE}: \`${mul.left} * ${mul.right}\`${leftType ? ` (${mul.left}: ${leftType})` : ''}${rightType ? ` (${mul.right}: ${rightType})` : ''} — cast to u128 before multiplying to prevent overflow`,
+      });
+    }
+  }
+
+  // (b) Bit-shift detection — << and >> silently wrap on overflow
+  const lines = source.split('\n');
+  let inTestBlock = false;
+  let inTestOnlyModule = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith('//')) continue;
+    if (/#\[test_only\]/.test(trimmed)) { inTestOnlyModule = true; continue; }
+    if (/#\[test[\],\s]/.test(trimmed)) { inTestBlock = true; continue; }
+    if (/\bfun\b/.test(trimmed) && !/#\[test/.test(trimmed)) {
+      inTestBlock = false;
+      if (inTestOnlyModule) { inTestOnlyModule = false; continue; }
+    }
+    if (inTestBlock || inTestOnlyModule) continue;
+
+    // detect << or >> on non-literal, non-const lines
+    if (/(<<|>>)/.test(trimmed)) {
+      // skip if line is a const declaration
+      if (/const\s+\w+/.test(trimmed)) continue;
+      // skip if inside a comment (already handled above)
+      // skip if operand is already u128/u256
+      if (/as\s+u128/.test(trimmed) || /as\s+u256/.test(trimmed)) continue;
+      if (/u128\s*(<<|>>)/.test(trimmed) || /u256\s*(<<|>>)/.test(trimmed)) continue;
+      // skip if this is a type annotation or generic, not arithmetic
+      if (/:\s*u\d+\s*[,)]/.test(trimmed) && !/(<<|>>)/.test(trimmed.split(':')[0])) continue;
+
+      const op = trimmed.includes('<<') ? '<<' : '>>';
+      findings.push({
+        rule: RULE_ID,
+        severity: SEVERITY,
+        file: filename,
+        line: i + 1,
+        message: `bit-shift \`${op}\` silently wraps on overflow — unlike +/-/*, shifts do NOT abort; validate the shift amount or cast to a wider type first`,
       });
     }
   }
