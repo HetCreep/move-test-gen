@@ -1,6 +1,6 @@
 /**
  * Selftest for lint rules — synthetic Move source, no sui needed.
- * Tests all 8 rules: MOV-001 through MOV-006 + MOV-011 + MOV-012.
+ * Tests all 9 rules: MOV-001 through MOV-006 + MOV-008 + MOV-011 + MOV-012 (MOV-002 includes shift extension).
  * Each new skip pattern gets a pin here BEFORE the rule ships.
  */
 import { check as check001 } from '../../../../rules/mov-001-missing-access-control.mjs';
@@ -453,6 +453,54 @@ module example::vault {
 assert('MOV-012: flags sender: address', check012(sender_unsafe, 'vault.move').length === 1);
 assert('MOV-012: passes ctx-based auth', check012(sender_safe_ctx, 'vault.move').length === 0);
 assert('MOV-012: passes to: address (destination)', check012(sender_safe_destination, 'vault.move').length === 0);
+
+// ── MOV-008: exact-equality payment assert ───────────────────────────
+
+import { check as check008 } from '../../../../rules/mov-008-exact-equality-assert.mjs';
+
+const eq_unsafe = `
+module example::pay {
+    public fun settle(payment: u64, required: u64) {
+        assert!(payment == required, 1);
+    }
+}`;
+
+const eq_safe_gte = `
+module example::pay {
+    public fun settle(payment: u64, required: u64) {
+        assert!(payment >= required, 1);
+    }
+}`;
+
+const eq_safe_zero = `
+module example::pay {
+    public fun check(amount: u64) {
+        assert!(amount == 0, 1);
+    }
+}`;
+
+assert('MOV-008: flags exact equality on payment', check008(eq_unsafe, 'pay.move').length === 1);
+assert('MOV-008: passes >= comparison', check008(eq_safe_gte, 'pay.move').length === 0);
+assert('MOV-008: passes == 0 zero check', check008(eq_safe_zero, 'pay.move').length === 0);
+
+// ── MOV-002 extension: bit-shift detection ───────────────────────────
+
+const shift_unsafe = `
+module example::math {
+    public fun scale(value: u64, bits: u8): u64 {
+        value << 32
+    }
+}`;
+
+const shift_safe_cast = `
+module example::math {
+    public fun scale(value: u64): u128 {
+        (value as u128) << 64
+    }
+}`;
+
+assert('MOV-002: flags bare << shift', check002(shift_unsafe, 'math.move').some(f => f.message.includes('shift')));
+assert('MOV-002: passes << with u128 cast', !check002(shift_safe_cast, 'math.move').some(f => f.message.includes('shift')));
 
 // ── Summary ──────────────────────────────────────────────────────────
 
