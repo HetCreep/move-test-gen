@@ -7,7 +7,7 @@ history is the source of truth.
 
 ## v1.6.0 — 2026-08-26
 
-New lint rules and accuracy improvements. Three of the new checks were inspired by patterns documented in @pankajjangid's [sui-move-auditor](https://github.com/AlphaFiTech/sui-ai-commons) — the exact-equality payment assert, bit-shift silent wrapping, and sender-as-address spoofability. Credited because that's where the signal came from.
+New lint rules and accuracy improvements. Three of the new checks were inspired by patterns documented in @jangid's [sui-move-auditor](https://github.com/AlphaFiTech/sui-ai-commons) — the exact-equality payment assert, bit-shift silent wrapping, and sender-as-address spoofability. Credited because that's where the signal came from.
 
 ### New rules
 
