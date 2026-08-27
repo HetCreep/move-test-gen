@@ -120,7 +120,17 @@ export function check(source, filename) {
       // function" and no later line will ever trip the function-end check
       // below. Collect this line's asserts right now, under this function,
       // then close it immediately.
-      if (braceDepth <= braceDepthBeforeLine) {
+      //
+      // A net delta of 0 is ALSO what a wrapped signature line looks like
+      // ("public fun foo(" with the params and opening `{` still to come
+      // on later lines) -- it contains no braces at all, so the delta is
+      // trivially 0 <= 0 with nothing having opened OR closed. Require
+      // this line to have actually opened a brace before treating it as a
+      // complete single-line body, or a wrapped signature gets misread as
+      // "already closed" and currentFn is cleared before its real body is
+      // ever scanned -- ten real findings on the maintainer's own oracle/
+      // farm fixtures went silent this way (12 -> 7 MOV-006 findings).
+      if (trimmed.includes('{') && braceDepth <= braceDepthBeforeLine) {
         collectAsserts(trimmed, currentFn, i + 1, codeUsage);
         currentFn = null;
       }

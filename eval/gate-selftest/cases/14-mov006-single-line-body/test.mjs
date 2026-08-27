@@ -16,6 +16,18 @@
  * applied, so a signature line whose net delta is <= 0 (opens and closes
  * within itself) is recognised as a complete single-line body: its asserts
  * are collected immediately, under the function that was just matched.
+ *
+ * That first fix was itself too loose: a WRAPPED signature ("public fun
+ * a(\n    x: u64\n) {\n") carries no brace at all on its `fun` line, so
+ * the net delta is trivially 0 <= 0 -- nothing opened OR closed -- and got
+ * misread as an already-closed single-line body, clearing currentFn before
+ * the real (later) body was ever scanned. Ten real findings vanished on
+ * the maintainer's own oracle/farm fixtures (12 -> 7). Fixed by requiring
+ * the line to have actually opened a brace (`trimmed.includes('{')`)
+ * before treating a net-zero-or-negative delta as a complete body -- the
+ * same `seenOpenBrace`-shaped guard this repo's own history already used
+ * for the identical depth-check-true-before-the-open-brace defect class
+ * (PR #55 / #59).
  */
 import { check } from '../../../../rules/mov-006-shared-abort-code.mjs';
 
@@ -62,6 +74,25 @@ assert(
 assert(
   'single-line functions with UNIQUE codes must not be flagged (no false positive from the fix)',
   check(singleLineUnique, 's.move').length === 0
+);
+
+const wrappedSignature = `module s::s {
+    const EDup: u64 = 1;
+    public fun a(
+        x: u64
+    ) {
+        assert!(x > 0, EDup);
+    }
+    public fun b(
+        y: u64
+    ) {
+        assert!(y > 1, EDup);
+    }
+}`;
+const wrappedFindings = check(wrappedSignature, 's.move');
+assert(
+  'a WRAPPED signature sharing an abort code in its (real, later) body must still be flagged',
+  wrappedFindings.length === 1 && wrappedFindings[0].message.includes('EDup')
 );
 
 if (errs.length) {
