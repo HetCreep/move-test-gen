@@ -1,0 +1,5 @@
+{
+  "note": "MOV-006 must detect a shared abort code whether the sharing functions are written single-line or multi-line -- flagged during PR #66, reproduced and fixed here",
+  "type": "script",
+  "script": "test.mjs"
+}
