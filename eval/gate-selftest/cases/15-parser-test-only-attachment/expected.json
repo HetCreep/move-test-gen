@@ -1,0 +1,5 @@
+{
+  "note": "move-parser's #[test_only]/#[test] attachment is item-boundary-based, not a fixed-line lookback: a leaked attribute must not silence MOV-002/MOV-004 on a later function, and a genuinely test-only function (multi-line or same-line attribute) must stay exempt",
+  "type": "script",
+  "script": "test.mjs"
+}

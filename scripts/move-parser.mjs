@@ -11,6 +11,8 @@
  * ask "what type is this variable?" without regex guessing.
  */
 
+import { stripBlockComments } from './strip-comments.mjs';
+
 export const WIDE_TYPES = new Set(['u128', 'u256']);
 
 /**
@@ -19,8 +21,15 @@ export const WIDE_TYPES = new Set(['u128', 'u256']);
  * @returns {{ moduleName: string, functions: ParsedFunction[], constants: Constant[] }}
  */
 export function parseModule(source) {
-  const lines = source.split('\n');
-  const moduleName = extractModuleName(source);
+  // Strip block comments up front: a #[test_only]/#[test] attribute (or a
+  // const/module declaration) sitting inside a commented-out block is not
+  // attached to anything real, and extractFunctions()'s attribute
+  // pass-through would otherwise walk straight through a /* ... */ line
+  // (single- or multi-line) as if it were blank. stripBlockComments()
+  // preserves line count, so downstream line numbers stay correct.
+  const stripped = stripBlockComments(source);
+  const lines = stripped.split('\n');
+  const moduleName = extractModuleName(stripped);
   const constants = extractConstants(lines);
   const functions = extractFunctions(lines);
   return { moduleName, constants, functions };
@@ -77,28 +86,47 @@ function extractFunctions(lines) {
   const functions = [];
   let i = 0;
 
+  // An attribute belongs to the item it is directly attached to, never to
+  // whatever function happens to follow within N lines. These flags carry
+  // an attribute across blank lines, comments, and stacked attribute lines
+  // (none of which are items of their own) but are cleared the instant we
+  // reach an actual item -- `use`, `struct`, `const`, or a `fun` that
+  // consumes them. That is the only way an attribute is "attached": nothing
+  // but pass-through lines between it and its item.
+  let pendingTestOnly = false;
+  let pendingTest = false;
+
   while (i < lines.length) {
     const trimmed = lines[i].trim();
 
-    // detect test attributes
-    let isTestOnly = false;
-    let isTest = false;
-    if (/^#\[test_only\]/.test(trimmed)) { isTestOnly = true; i++; continue; }
-    if (/^#\[test[\],\s]/.test(trimmed)) { isTest = true; }
+    if (trimmed === '' || trimmed.startsWith('//')) { i++; continue; }
 
-    // detect function start
+    // A line that is ONLY an attribute (no same-line item) -- carry its
+    // flag forward and keep scanning for the item it decorates. A trailing
+    // `//` comment (`#[test_only] // helper used by the suite`) doesn't
+    // disqualify it -- strip that before checking, same idiom parseBody()
+    // already uses for the identical reason.
+    const attrCodeOnly = trimmed.replace(/\/\/.*$/, '').trim();
+    const attrOnly = attrCodeOnly.match(/^#\[([^\]]*)\]$/);
+    if (attrOnly) {
+      if (/^test_only\b/.test(attrOnly[1])) pendingTestOnly = true;
+      else if (/^test\b/.test(attrOnly[1])) pendingTest = true;
+      // any other attribute (#[allow(...)], #[expected_failure(...)]) is
+      // just another line stacked above the same item -- leave flags as-is.
+      i++;
+      continue;
+    }
+
+    // detect function start -- tolerates a leading same-line attribute
+    // (`#[test_only] fun helper() {`), see parseFunctionSignature.
     const fnInfo = parseFunctionSignature(lines, i);
     if (fnInfo) {
-      // inherit test flags from preceding attributes
-      if (isTestOnly) fnInfo.isTestOnly = true;
-      if (isTest) fnInfo.isTest = true;
-
-      // check previous lines for test attributes
-      for (let j = Math.max(0, i - 3); j < i; j++) {
-        const prev = lines[j].trim();
-        if (/^#\[test_only\]/.test(prev)) fnInfo.isTestOnly = true;
-        if (/^#\[test[\],\s]/.test(prev)) fnInfo.isTest = true;
-      }
+      if (/^#\[test_only\]/.test(trimmed)) fnInfo.isTestOnly = true;
+      if (/^#\[test[\],\s]/.test(trimmed)) fnInfo.isTest = true;
+      if (pendingTestOnly) fnInfo.isTestOnly = true;
+      if (pendingTest) fnInfo.isTest = true;
+      pendingTestOnly = false;
+      pendingTest = false;
 
       // find function body boundaries
       const bodyRange = findBraceBlock(lines, fnInfo.sigEndLine);
@@ -112,9 +140,11 @@ function extractFunctions(lines) {
       }
     }
 
-    // reset test flags if no function followed
-    isTestOnly = false;
-    isTest = false;
+    // Reached a different item (use/struct/const, an unmatched fun, or any
+    // other code) -- any pending attribute belonged to THIS item, not to
+    // whatever function comes later, so it does not carry any further.
+    pendingTestOnly = false;
+    pendingTest = false;
     i++;
   }
 
@@ -124,9 +154,18 @@ function extractFunctions(lines) {
 function parseFunctionSignature(lines, startIdx) {
   const line = lines[startIdx].trim();
 
+  // Strip a leading same-line attribute (`#[test_only] fun foo() {`) so the
+  // signature regex still anchors correctly. A stripped attribute CAN carry
+  // its own parens (`#[allow(lint(self_transfer))] public fun payout(...)`)
+  // -- the param-collector loop below uses this stripped line rather than
+  // the raw one for its own starting line, specifically so a balanced
+  // paren pair inside the attribute never gets mistaken for the real
+  // parameter list and truncates it early.
+  const sigLine = line.replace(/^(?:#\[[^\]]*\]\s*)+/, '');
+
   // match function declaration
   const fnRegex = /^(public\s+entry\s+|public\(friend\)\s+|public\(package\)\s+|public\s+|entry\s+)?fun\s+(\w+)(?:<([^>]*)>)?\s*\(/;
-  const m = line.match(fnRegex);
+  const m = sigLine.match(fnRegex);
   if (!m) return null;
 
   const visRaw = (m[1] || '').trim();
@@ -144,7 +183,11 @@ function parseFunctionSignature(lines, startIdx) {
   let depth = 0;
   let started = false;
   for (let j = startIdx; j < Math.min(startIdx + 15, lines.length); j++) {
-    for (const ch of lines[j]) {
+    // The starting line may carry a same-line attribute prefix with its own
+    // parens (see sigLine above) -- use the already-stripped text for it so
+    // those parens are never counted. Every later line has no such prefix.
+    const lineText = j === startIdx ? sigLine : lines[j];
+    for (const ch of lineText) {
       if (ch === '(') { depth++; started = true; }
       if (started && depth > 0) paramStr += ch;
       if (ch === ')') { depth--; if (started && depth === 0) { sigEndLine = j; break; } }
