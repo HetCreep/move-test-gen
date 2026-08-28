@@ -15,11 +15,20 @@
  *
  * Detection: any function declaration combining `public(package)` with
  * `entry`. The same applies to `public(friend) entry` in legacy editions.
+ * Uses the Move parser (scripts/move-parser.mjs) for signature
+ * reassembly, so a same-line attribute (`#[allow(...)] public(package)
+ * entry fun f(...)`) or a declaration wrapped across lines
+ * (`public(package)\nentry fun f(...)`) is still recognised, not just
+ * the single anchored-line shape.
  */
+
+import { parseModule } from '../scripts/move-parser.mjs';
 
 const RULE_ID = 'MOV-011';
 const SEVERITY = 'HIGH';
 const TITLE = 'public(package) entry function is externally callable via PTB';
+
+const FLAGGED_VISIBILITIES = new Set(['public(package) entry', 'public(friend) entry']);
 
 /**
  * @param {string} source — file content
@@ -28,24 +37,18 @@ const TITLE = 'public(package) entry function is externally callable via PTB';
  */
 export function check(source, filename) {
   const findings = [];
-  const lines = source.split('\n');
+  const mod = parseModule(source);
 
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
+  for (const fn of mod.functions) {
+    if (!FLAGGED_VISIBILITIES.has(fn.visibility)) continue;
 
-    if (trimmed.startsWith('//')) continue;
-
-    if (/^public\s*\(\s*(?:package|friend)\s*\)\s+entry\s+fun\b/.test(trimmed)) {
-      const nameMatch = trimmed.match(/entry\s+fun\s+(\w+)/);
-      const name = nameMatch ? nameMatch[1] : '(unknown)';
-      findings.push({
-        rule: RULE_ID,
-        severity: SEVERITY,
-        file: filename,
-        line: i + 1,
-        message: `${TITLE}: \`${name}\` — \`entry\` defeats the package/friend restriction for PTB callers; remove \`entry\` or add an authorization check`,
-      });
-    }
+    findings.push({
+      rule: RULE_ID,
+      severity: SEVERITY,
+      file: filename,
+      line: fn.startLine,
+      message: `${TITLE}: \`${fn.name}\` — \`entry\` defeats the package/friend restriction for PTB callers; remove \`entry\` or add an authorization check`,
+    });
   }
 
   return findings;

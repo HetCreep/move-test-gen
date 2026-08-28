@@ -15,6 +15,13 @@ import { stripBlockComments } from './strip-comments.mjs';
 
 export const WIDE_TYPES = new Set(['u128', 'u256']);
 
+// A line that is ENTIRELY one or more visibility/entry modifier tokens,
+// with no `fun` keyword yet -- the leading tokens of a declaration wrapped
+// across lines (`public(package)\nentry fun f(...)`). Never matches a line
+// that also has other content, so it can't accidentally swallow an
+// unrelated statement.
+const BARE_VIS_RE = /^(?:public\s*\(\s*(?:package|friend)\s*\)|public|entry)(?:\s+(?:public\s*\(\s*(?:package|friend)\s*\)|public|entry))*$/;
+
 /**
  * Parse a Move source file into module-level structure.
  * @param {string} source — file content
@@ -95,6 +102,11 @@ function extractFunctions(lines) {
   // but pass-through lines between it and its item.
   let pendingTestOnly = false;
   let pendingTest = false;
+  // A visibility/entry modifier with nothing else on its line (a wrapped
+  // `public(package)\nentry fun f(...)` declaration) is not a complete item
+  // on its own -- accumulate it and hand it to whichever `fun` line follows,
+  // the same "attach forward" shape as the attribute pending flags above.
+  let pendingVisPrefix = '';
 
   while (i < lines.length) {
     const trimmed = lines[i].trim();
@@ -117,9 +129,19 @@ function extractFunctions(lines) {
       continue;
     }
 
+    // A bare visibility/entry fragment, no `fun` on the line yet -- hold it
+    // rather than treating it as a "different item" boundary.
+    if (!/\bfun\b/.test(trimmed) && BARE_VIS_RE.test(trimmed)) {
+      pendingVisPrefix = pendingVisPrefix ? `${pendingVisPrefix} ${trimmed}` : trimmed;
+      i++;
+      continue;
+    }
+
     // detect function start -- tolerates a leading same-line attribute
-    // (`#[test_only] fun helper() {`), see parseFunctionSignature.
-    const fnInfo = parseFunctionSignature(lines, i);
+    // (`#[test_only] fun helper() {`) and a leading visibility fragment
+    // held on an earlier line, see parseFunctionSignature.
+    const fnInfo = parseFunctionSignature(lines, i, pendingVisPrefix);
+    pendingVisPrefix = '';
     if (fnInfo) {
       if (/^#\[test_only\]/.test(trimmed)) fnInfo.isTestOnly = true;
       if (/^#\[test[\],\s]/.test(trimmed)) fnInfo.isTest = true;
@@ -151,8 +173,12 @@ function extractFunctions(lines) {
   return functions;
 }
 
-function parseFunctionSignature(lines, startIdx) {
-  const line = lines[startIdx].trim();
+function parseFunctionSignature(lines, startIdx, externalPrefix = '') {
+  const rawLine = lines[startIdx].trim();
+  // A caller may have accumulated leading visibility/entry tokens from
+  // earlier lines (`public(package)\nentry fun f(...)`) -- fold them in
+  // before matching, so a wrapped declaration is seen as one signature.
+  const line = externalPrefix ? `${externalPrefix} ${rawLine}` : rawLine;
 
   // Strip a leading same-line attribute (`#[test_only] fun foo() {`) so the
   // signature regex still anchors correctly. A stripped attribute CAN carry
@@ -163,13 +189,20 @@ function parseFunctionSignature(lines, startIdx) {
   // parameter list and truncates it early.
   const sigLine = line.replace(/^(?:#\[[^\]]*\]\s*)+/, '');
 
-  // match function declaration
-  const fnRegex = /^(public\s+entry\s+|public\(friend\)\s+|public\(package\)\s+|public\s+|entry\s+)?fun\s+(\w+)(?:<([^>]*)>)?\s*\(/;
+  // match function declaration. `public(package) entry` / `public(friend)
+  // entry` (package-scoped in name only -- `entry` makes it a PTB target
+  // regardless) are distinct alternatives, not derived from combining the
+  // bare forms: the bare-form alternatives on their own stop consuming at
+  // the closing `)`, so `entry` right after would never be reached without
+  // its own explicit alternative.
+  const fnRegex = /^(public\s+entry\s+|public\(package\)\s+entry\s+|public\(friend\)\s+entry\s+|public\(friend\)\s+|public\(package\)\s+|public\s+|entry\s+)?fun\s+(\w+)(?:<([^>]*)>)?\s*\(/;
   const m = sigLine.match(fnRegex);
   if (!m) return null;
 
   const visRaw = (m[1] || '').trim();
   const visibility = visRaw === '' ? 'private' :
+    visRaw.includes('friend') && visRaw.includes('entry') ? 'public(friend) entry' :
+    visRaw.includes('package') && visRaw.includes('entry') ? 'public(package) entry' :
     visRaw.includes('friend') ? 'public(friend)' :
     visRaw.includes('entry') && visRaw.includes('public') ? 'public entry' :
     visRaw.includes('entry') ? 'entry' : 'public';
