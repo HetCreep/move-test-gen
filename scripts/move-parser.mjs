@@ -210,16 +210,25 @@ function parseFunctionSignature(lines, startIdx, externalPrefix = '') {
   const name = m[2];
   const typeParams = m[3] ? m[3].split(',').map(t => t.trim()) : [];
 
+  // Where the REAL parameter list's own opening paren sits in sigLine --
+  // fnRegex's match already ends with `\s*\(`, consuming exactly up to and
+  // including it, so m[0]'s length is that position. A visibility prefix
+  // can carry its own balanced parens before this point (`public(package)`,
+  // `public(friend)`) -- starting the scan here, not at char 0, is what
+  // keeps them from being mistaken for the parameter list itself.
+  const parenStart = m[0].length - 1;
+
   // collect full parameter list (may span multiple lines)
   let paramStr = '';
   let sigEndLine = startIdx;
   let depth = 0;
   let started = false;
   for (let j = startIdx; j < Math.min(startIdx + 15, lines.length); j++) {
-    // The starting line may carry a same-line attribute prefix with its own
-    // parens (see sigLine above) -- use the already-stripped text for it so
-    // those parens are never counted. Every later line has no such prefix.
-    const lineText = j === startIdx ? sigLine : lines[j];
+    // The starting line may carry a same-line attribute prefix, and/or a
+    // visibility modifier with its own parens, before the real parameter
+    // list (see sigLine/parenStart above) -- slice both away so only the
+    // real `(...)` is ever counted. Every later line has no such prefix.
+    const lineText = j === startIdx ? sigLine.slice(parenStart) : lines[j];
     for (const ch of lineText) {
       if (ch === '(') { depth++; started = true; }
       if (started && depth > 0) paramStr += ch;

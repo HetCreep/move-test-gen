@@ -19,7 +19,8 @@
  * reassembly, so a same-line attribute (`#[allow(...)] public(package)
  * entry fun f(...)`) or a declaration wrapped across lines
  * (`public(package)\nentry fun f(...)`) is still recognised, not just
- * the single anchored-line shape.
+ * the single anchored-line shape. A #[test_only]/#[test] function is
+ * exempt -- it is never deployed, so flagging it is a false positive.
  */
 
 import { parseModule } from '../scripts/move-parser.mjs';
@@ -40,6 +41,9 @@ export function check(source, filename) {
   const mod = parseModule(source);
 
   for (const fn of mod.functions) {
+    // A #[test_only]/#[test] helper is never deployed -- the same
+    // exemption MOV-002/MOV-004 already apply via the parser's own flags.
+    if (fn.isTest || fn.isTestOnly) continue;
     if (!FLAGGED_VISIBILITIES.has(fn.visibility)) continue;
 
     findings.push({
