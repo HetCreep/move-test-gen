@@ -1,0 +1,5 @@
+{
+  "note": "MOV-011 must catch public(package)/public(friend) entry across a same-line attribute prefix and a declaration wrapped across lines, not just the single anchored-line shape, while staying silent on entry-alone, public(package)-alone, and the shape inside a comment or string",
+  "type": "script",
+  "script": "test.mjs"
+}
