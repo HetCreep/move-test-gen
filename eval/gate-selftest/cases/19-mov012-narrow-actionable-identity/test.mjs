@@ -26,6 +26,16 @@
  * `recipient` is not an identity claim -- a destination names where
  * value is going, a target the caller is entitled to choose, unlike a
  * claimed SOURCE (`from`), which stays spoofable.
+ *
+ * FINDINGS-BACK follow-up: `hasCtx` tested `p.type === 'TxContext'`
+ * against a type group that could not span `::`, so a fully-qualified
+ * `ctx: &mut sui::tx_context::TxContext` parsed as type `sui` and
+ * silenced the whole function -- a real fail-open even though the
+ * corpus's own idiom is `use sui::tx_context::TxContext;` then the
+ * bare form (84/84 occurrences bare, zero qualified there). Fixed by
+ * capturing the qualified path whole and resolving to its LAST
+ * segment, never a substring test (a substring test would re-admit
+ * `MyTxContextWrapper` and defeat the narrowing this rule exists for).
  */
 import { check } from '../../../../rules/mov-012-sender-as-address-param.mjs';
 
@@ -87,6 +97,83 @@ const adminTp = `module d::e {
 assert(
   'a different identity name (admin) with ctx must still be flagged',
   check(adminTp, 'e.move').length === 1
+);
+
+// ── true positive: `caller`, WITH ctx ──
+const callerTp = `module d::g {
+    public fun caller_action(caller: address, v: &mut Vault, ctx: &mut TxContext) {
+        assert!(caller == v.owner, 0);
+    }
+}`;
+assert(
+  'a different identity name (caller) with ctx must still be flagged',
+  check(callerTp, 'g.move').length === 1
+);
+
+// ── true positive: `from` (a claimed SOURCE), WITH ctx -- this is the
+// name the design deliberately keeps (unlike `recipient`); nothing else
+// in this case pins that it still fires ──
+const fromTp = `module d::h {
+    public fun move_funds(from: address, v: &mut Vault, ctx: &mut TxContext) {
+        assert!(from == v.owner, 0);
+    }
+}`;
+assert(
+  '`from` (a claimed source, kept in IDENTITY_NAMES) with ctx must still be flagged',
+  check(fromTp, 'h.move').length === 1
+);
+
+// ── true positive: `owner`, WITH an immutable &TxContext (not &mut) ──
+const ownerImmutTp = `module d::i {
+    public fun read_owned(owner: address, v: &Vault, ctx: &TxContext) {
+        assert!(owner == v.owner, 0);
+    }
+}`;
+assert(
+  'owner: address with an immutable &TxContext must still be flagged',
+  check(ownerImmutTp, 'i.move').length === 1
+);
+
+// ── hasCtx must resolve a `::`-qualified TxContext to its last segment,
+// never by substring -- FINDINGS-BACK regression pin, four rows ──
+const qualifiedCtx = `module d::j {
+    public fun act(sender: address, ctx: &mut sui::tx_context::TxContext) {
+        abort 0
+    }
+}`;
+assert(
+  'a fully-qualified sui::tx_context::TxContext must still count as having ctx',
+  check(qualifiedCtx, 'j.move').length === 1
+);
+
+const bareCtxControl = `module d::k {
+    public fun act(sender: address, ctx: &mut TxContext) {
+        abort 0
+    }
+}`;
+assert(
+  'control: bare TxContext must still count as having ctx',
+  check(bareCtxControl, 'k.move').length === 1
+);
+
+const namedCtxWrongType = `module d::l {
+    public fun act(sender: address, ctx: &Clock) {
+        abort 0
+    }
+}`;
+assert(
+  'a param merely NAMED ctx but typed &Clock must NOT count as having ctx',
+  check(namedCtxWrongType, 'l.move').length === 0
+);
+
+const substringWrapperType = `module d::m {
+    public fun act(sender: address, ctx: &mut MyTxContextWrapper) {
+        abort 0
+    }
+}`;
+assert(
+  'a type merely CONTAINING the substring TxContext must NOT count -- no substring matching',
+  check(substringWrapperType, 'm.move').length === 0
 );
 
 // ── #[test_only] skip must survive unchanged ──

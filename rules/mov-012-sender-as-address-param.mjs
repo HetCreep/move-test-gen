@@ -96,11 +96,13 @@ export function check(source, filename) {
     }
     paramStr = paramStr.slice(1); // remove leading (
 
-    // parse each parameter
+    // parse each parameter. The type group captures a `::`-qualified path
+    // (sui::tx_context::TxContext) whole, then resolves to its LAST segment
+    // -- never a substring test, which would re-admit MyTxContextWrapper.
     const params = paramStr.split(',').map(p => p.trim()).filter(Boolean)
-      .map(p => p.match(/(\w+)\s*:\s*(&mut\s+|&)?\s*(\w+)/))
+      .map(p => p.match(/(\w+)\s*:\s*(&mut\s+|&)?\s*([\w:]+)/))
       .filter(Boolean)
-      .map(m => ({ name: m[1], type: m[3] }));
+      .map(m => ({ name: m[1], type: m[3].split('::').pop() }));
 
     // No TxContext, no finding: the rule's own prescribed fix,
     // tx_context::sender(ctx), needs one to call. A function with no
