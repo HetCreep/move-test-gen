@@ -1,0 +1,5 @@
+{
+  "note": "Two defects, one class: the tool could not read the source and still reported CLEAN. U1: a whitespace-collapsed one-line module made parseModule() return zero functions, so every parser-backed rule saw nothing. U2: an unterminated /* blanked the file to EOF with no signal that anything was wrong. Fixed at the mechanism (move-parser.mjs's anchored signature regex; strip-comments.mjs/lint.mjs's missing unreadable-file path), never by pre-formatting source or touching a rule file.",
+  "type": "script",
+  "script": "test.mjs"
+}

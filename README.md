@@ -159,14 +159,16 @@ The skill aims for:
 | `0` | clean |
 | `1` | the gate failed — unpaired asserts, surviving mutants, or a lint finding at or above the threshold |
 | `2` | usage error, or a sources/tests directory that cannot be read |
-| `3` | the tool could not run and produced no verdict (for example `--mutate` was requested but the `sui` CLI is missing) |
+| `3` | the tool could not run and produced no verdict (for example `--mutate` was requested but the `sui` CLI is missing, or `--lint`/`scripts/lint.mjs` hit a `.move` file it could not read — such as an unterminated `/*` block comment) |
 
 `130` and `143` are the usual SIGINT / SIGTERM codes.
 
 A defect outranks a missing tool: if Layer 1 found something, the run exits `1`
-even when `--mutate` could not run. Exit `3` means no verdict was reached, which
-is a different thing from a verdict of "failed" and should usually be read as a
-broken CI configuration rather than a broken pull request.
+even when `--mutate` could not run. The same precedence holds for an unreadable
+file found by `--lint`: a real finding elsewhere in the same run still exits `1`.
+Exit `3` means no verdict was reached, which is a different thing from a verdict
+of "failed" and should usually be read as a broken CI configuration rather than
+a broken pull request.
 
 ## Running on untrusted code
 

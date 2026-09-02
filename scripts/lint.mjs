@@ -1,4 +1,4 @@
-import { stripBlockComments } from "./strip-comments.mjs";
+import { stripBlockComments, hasUnterminatedBlockComment } from "./strip-comments.mjs";
 /**
  * lint.mjs — security lint engine for Sui Move source code.
  *
@@ -152,10 +152,22 @@ export async function runLint(sourcesDir, options = {}) {
   const sourceFiles = walkDir(resolve(sourcesDir), '.move');
   const allFindings = [];
   let suppressed = 0;
+  const unreadable = [];
 
   for (const srcPath of sourceFiles) {
     const source = readFileSync(srcPath, 'utf8');
     const filename = relative(process.cwd(), srcPath);
+
+    // An unterminated `/*` makes stripBlockComments() blank everything from
+    // there to EOF -- the rules below would then scan an effectively empty
+    // file and report "no findings", which is not a verdict, it's a file we
+    // never actually read. Record it and move on: don't run any rule
+    // against blanked-out content, and don't let a silent "clean" stand in
+    // for "unreadable".
+    if (hasUnterminatedBlockComment(source)) {
+      unreadable.push({ file: filename, reason: 'unterminated block comment (/* with no matching */)' });
+      continue;
+    }
 
     // skip #[test_only] modules -- scoped per module, not per file: a
     // test-only module earlier in the file must not silence a real module
@@ -200,7 +212,7 @@ export async function runLint(sourcesDir, options = {}) {
     }
   }
 
-  return { findings: allFindings, ruleCount: rules.length, suppressed };
+  return { findings: allFindings, ruleCount: rules.length, suppressed, unreadable };
 }
 
 /**
@@ -234,6 +246,20 @@ export function printLintResults(findings, ruleCount, suppressed = 0) {
   console.log(`\n${findings.length} finding(s): ${summary}${note}`);
 }
 
+/**
+ * Print the files runLint() could not read, so a "No findings." above it
+ * never gets mistaken for "we scanned everything and it's clean" when part
+ * of the corpus was actually unreadable.
+ */
+export function printUnreadable(unreadable) {
+  if (!unreadable || unreadable.length === 0) return;
+  console.log(`\n=== Unreadable (${unreadable.length}) ===\n`);
+  for (const u of unreadable) {
+    console.log(`  ⚠️  ${u.file} — ${u.reason}`);
+  }
+  console.log('\nThese files produced no verdict and were not scanned by any rule.');
+}
+
 // Severity ordering, shared by the standalone CLI and the gate so the two can
 // never disagree about what fails a build.
 export const SEVERITY_ORDER = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -256,9 +282,9 @@ if (process.argv[1] && process.argv[1].endsWith('lint.mjs')) {
   }
   const disIdx = process.argv.indexOf('--disable');
   const disable = disIdx >= 0 ? String(process.argv[disIdx + 1] || '').split(',') : [];
-  let findings, ruleCount, suppressed;
+  let findings, ruleCount, suppressed, unreadable;
   try {
-    ({ findings, ruleCount, suppressed } = await runLint(dir, { disable }));
+    ({ findings, ruleCount, suppressed, unreadable } = await runLint(dir, { disable }));
   } catch (e) {
     // Match check-coverage.mjs's own contract (exit 2, usage error) for the
     // same failure -- an unhandled error here previously crashed with a raw
@@ -272,9 +298,19 @@ if (process.argv[1] && process.argv[1].endsWith('lint.mjs')) {
     process.exit(2);
   }
   printLintResults(findings, ruleCount, suppressed);
+  printUnreadable(unreadable);
   const failIdx = process.argv.indexOf('--fail-on');
   const threshold = failIdx >= 0 ? process.argv[failIdx + 1] : 'high';
   if (shouldFail(findings, threshold)) {
+    // A real defect outranks an unreadable file elsewhere in the same run --
+    // README's own precedence rule ("a defect outranks a missing tool"),
+    // applied here: exit 1 means a verdict WAS reached, and it was bad.
     process.exit(1);
+  }
+  if (unreadable.length > 0) {
+    // No defect found, but at least one file produced no verdict at all --
+    // this is not "clean" (exit 0) and not "a finding" (exit 1). README's
+    // exit-code table: 3 = "the tool could not run and produced no verdict."
+    process.exit(3);
   }
 }
