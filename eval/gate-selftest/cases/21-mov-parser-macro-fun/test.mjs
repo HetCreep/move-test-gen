@@ -9,19 +9,23 @@
  * Disclosed as a known blind spot in PR #85's own body; this unit closes
  * it with ONE regex alternative, re-arming all four rules at once.
  *
- * LEGALITY CHECK (source-grounded, move-book.com/move-basics/macros/,
- * quoted): "A macro function looks and feels like a regular function, but
- * it does not exist at runtime. Instead, the compiler expands the macro:
- * at every call site, the body of the macro is substituted inline..."
- * `entry` marks a function as directly PTB-invocable at the RUNTIME
- * level -- a macro has no runtime existence for that marker to attach to,
- * so `entry` on a macro is illegal. MOV-011 (the public(package)-entry
- * bypass rule) is therefore pinned on its NEAREST LEGAL shapes instead of
- * an illegal macro+entry combination: it must NOT fire on a legal
- * `public(package) macro fun` (no entry, no PTB-callable surface, no
- * bypass to detect), and it must still fire, unaffected, on a plain
+ * SOURCE CHECK (move-book.com/move-basics/macros/, quoted): "A macro
+ * function looks and feels like a regular function, but it does not
+ * exist at runtime. Instead, the compiler expands the macro: at every
+ * call site, the body of the macro is substituted inline..." `entry`
+ * marks a function as directly PTB-invocable at the RUNTIME level -- a
+ * macro has no runtime representation for that marker to attach to, so
+ * `entry` on a macro is at best meaningless. CORRECTED by FINAL CHECK:
+ * the Move Book page confirms the runtime-representation half verbatim
+ * but does NOT state that `entry macro` is rejected -- that stronger
+ * "illegal" claim was an unsupported inference, not something the cited
+ * source says. MOV-011 is pinned on its NEAREST NORMAL shapes rather
+ * than an entry+macro combination either way: it must NOT fire on a
+ * `public(package) macro fun` with no `entry` (no PTB-callable surface,
+ * no bypass to detect), and it must still fire, unaffected, on a plain
  * `public(package) entry fun` (a regression guard proving this unit
- * didn't touch MOV-011's real detection).
+ * didn't touch MOV-011's real detection). This is a behavioural pin, not
+ * a claim about what the grammar permits.
  *
  * Also fixed, disclosed rather than silently left broken: `parseParams`'s
  * `<>`-depth comma-splitter treated the bare `>` in a macro lambda
@@ -63,9 +67,10 @@
  * operand text; it now correctly recognizes the wide type and stays
  * silent. Ratio, MEASURED (not copied from either side's prior claim):
  * on an idiomatic `$`-parameter macro, MOV-002/004/008 are genuinely
- * RE-ARMED (3 of 4); MOV-011 is N/A BY LANGUAGE RULE, not re-armed and
- * not blind -- `entry` on a macro is illegal, so there is no bypass
- * surface for it to ever detect there.
+ * RE-ARMED (3 of 4); MOV-011 is N/A, not re-armed and not blind -- a
+ * macro has no runtime representation for `entry` to attach to (see the
+ * SOURCE CHECK above), so there is no PTB-callable bypass surface for it
+ * to ever detect there.
  */
 import { parseModule } from '../../../../scripts/move-parser.mjs';
 import { check as check002 } from '../../../../rules/mov-002-unchecked-arithmetic.mjs';
@@ -139,8 +144,9 @@ module d::m {
 }`;
 assert('MOV-008 fires on an exact-equality payment assert inside a macro body', check008(macroPayment, 'm.move').length === 1);
 
-// ── MOV-011: entry+macro is illegal Move -- pinned on the nearest legal
-// shapes instead (see the docstring's legality check) ──────────────────
+// ── MOV-011: a macro has no runtime representation for `entry` to
+// attach to -- pinned on the nearest normal shapes instead (see the
+// docstring's SOURCE CHECK) ─────────────────────────────────────────────
 const macroPackageNoEntry = `
 module d::m {
     public(package) macro fun helper($a: u64): u64 { $a }
@@ -211,5 +217,5 @@ if (errs.length) {
   for (const e of errs) console.log(`  ✗ ${e}`);
   process.exit(1);
 }
-console.log('macro fun re-arms MOV-002/004/008 (3 of 4) on idiomatic $-parameter macros; MOV-011 is N/A by language rule (entry+macro is illegal Move, pinned on its nearest legal shapes); $ preserved in params[].name fixes both the real MOV-002 gap and a latent wide-type false positive; a lambda-typed param still splits correctly; a clean macro body and a plain-fun twin are both unaffected');
+console.log('macro fun re-arms MOV-002/004/008 (3 of 4) on idiomatic $-parameter macros; MOV-011 is N/A (a macro has no runtime representation for entry, pinned on its nearest normal shapes); $ preserved in params[].name fixes both the real MOV-002 gap and a latent wide-type false positive; a lambda-typed param still splits correctly; a clean macro body and a plain-fun twin are both unaffected');
 process.exit(0);

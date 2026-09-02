@@ -198,11 +198,14 @@ function parseFunctionSignature(lines, startIdx, externalPrefix = '') {
   // its own explicit alternative.
   //
   // `macro` is its OWN optional group, after the visibility alternatives
-  // and before `fun` -- never combined into the entry alternatives above,
-  // because Move macros are expanded at the call site and have no runtime
-  // existence (move-book.com/move-basics/macros/), so there is nothing for
-  // `entry` (a runtime PTB-invocable marker) to attach to. A macro can be
-  // `public`/`public(package)`/`public(friend)`/private, but never `entry`.
+  // and before `fun`. Move macros are expanded at the call site and have
+  // no runtime representation (move-book.com/move-basics/macros/), so an
+  // `entry` marker on one is at best meaningless -- but the Move Book
+  // does not state that `entry macro` is rejected, so the group is
+  // placed to parse it if it appears rather than to assume it cannot:
+  // `public(package) entry macro fun f(...)` still matches (the entry
+  // alternatives above consume first, `macro` consumes next), and
+  // MOV-011 still fires on it unchanged.
   const fnRegex = /^(public\s+entry\s+|public\(package\)\s+entry\s+|public\(friend\)\s+entry\s+|public\(friend\)\s+|public\(package\)\s+|public\s+|entry\s+)?(macro\s+)?fun\s+(\w+)(?:<([^>]*)>)?\s*\(/;
   const m = sigLine.match(fnRegex);
   if (!m) return null;
