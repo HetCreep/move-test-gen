@@ -218,11 +218,15 @@ export async function runLint(sourcesDir, options = {}) {
 /**
  * Print lint results to console.
  */
-export function printLintResults(findings, ruleCount, suppressed = 0) {
+export function printLintResults(findings, ruleCount, suppressed = 0, hasUnreadable = false) {
   console.log(`\n=== Security Lint (${ruleCount} rules) ===\n`);
 
   if (findings.length === 0) {
-    console.log('No findings.\n');
+    // "No findings." on its own reads as "scanned everything, clean" -- the
+    // exact string a CI log grep matches. When part of the corpus produced
+    // no verdict at all (see printUnreadable, below), the human-readable
+    // line has to say so too, not just the exit code.
+    console.log(hasUnreadable ? 'No findings in the files that could be scanned.\n' : 'No findings.\n');
     if (suppressed > 0) console.log(`(${suppressed} finding(s) suppressed)\n`);
     return;
   }
@@ -297,7 +301,7 @@ if (process.argv[1] && process.argv[1].endsWith('lint.mjs')) {
     console.error(`Error: lint could not run — ${e.message}`);
     process.exit(2);
   }
-  printLintResults(findings, ruleCount, suppressed);
+  printLintResults(findings, ruleCount, suppressed, unreadable.length > 0);
   printUnreadable(unreadable);
   const failIdx = process.argv.indexOf('--fail-on');
   const threshold = failIdx >= 0 ? process.argv[failIdx + 1] : 'high';
