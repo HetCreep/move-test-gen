@@ -67,6 +67,7 @@ function extractConstants(lines) {
  * @typedef {{
  *   name: string,
  *   visibility: 'public'|'public(friend)'|'public entry'|'entry'|'private',
+ *   isMacro: boolean,
  *   typeParams: string[],
  *   params: { name: string, type: string, isMut: boolean, isRef: boolean }[],
  *   returnType: string|null,
@@ -195,7 +196,14 @@ function parseFunctionSignature(lines, startIdx, externalPrefix = '') {
   // bare forms: the bare-form alternatives on their own stop consuming at
   // the closing `)`, so `entry` right after would never be reached without
   // its own explicit alternative.
-  const fnRegex = /^(public\s+entry\s+|public\(package\)\s+entry\s+|public\(friend\)\s+entry\s+|public\(friend\)\s+|public\(package\)\s+|public\s+|entry\s+)?fun\s+(\w+)(?:<([^>]*)>)?\s*\(/;
+  //
+  // `macro` is its OWN optional group, after the visibility alternatives
+  // and before `fun` -- never combined into the entry alternatives above,
+  // because Move macros are expanded at the call site and have no runtime
+  // existence (move-book.com/move-basics/macros/), so there is nothing for
+  // `entry` (a runtime PTB-invocable marker) to attach to. A macro can be
+  // `public`/`public(package)`/`public(friend)`/private, but never `entry`.
+  const fnRegex = /^(public\s+entry\s+|public\(package\)\s+entry\s+|public\(friend\)\s+entry\s+|public\(friend\)\s+|public\(package\)\s+|public\s+|entry\s+)?(macro\s+)?fun\s+(\w+)(?:<([^>]*)>)?\s*\(/;
   const m = sigLine.match(fnRegex);
   if (!m) return null;
 
@@ -207,8 +215,9 @@ function parseFunctionSignature(lines, startIdx, externalPrefix = '') {
     visRaw.includes('entry') && visRaw.includes('public') ? 'public entry' :
     visRaw.includes('entry') ? 'entry' : 'public';
 
-  const name = m[2];
-  const typeParams = m[3] ? m[3].split(',').map(t => t.trim()) : [];
+  const isMacro = Boolean(m[2]);
+  const name = m[3];
+  const typeParams = m[4] ? m[4].split(',').map(t => t.trim()) : [];
 
   // Where the REAL parameter list's own opening paren sits in sigLine --
   // fnRegex's match already ends with `\s*\(`, consuming exactly up to and
@@ -255,6 +264,7 @@ function parseFunctionSignature(lines, startIdx, externalPrefix = '') {
   return {
     name,
     visibility,
+    isMacro,
     typeParams,
     params,
     returnType,
@@ -275,7 +285,13 @@ function parseParams(paramStr) {
   let current = '';
   for (const ch of paramStr) {
     if (ch === '<') depth++;
-    if (ch === '>') depth--;
+    // Clamped at 0, never negative: a macro lambda-type param
+    // (`$f: |u64| -> u64`) carries a bare `>` in its `->` that never
+    // opened a `<` -- an unclamped depth-- drives depth negative, and
+    // the NEXT real top-level comma (separating this param from the
+    // next) then fails its `depth === 0` check and gets silently
+    // swallowed into the current param's text instead of splitting.
+    if (ch === '>' && depth > 0) depth--;
     if (ch === ',' && depth === 0) {
       params.push(parseOneParam(current.trim()));
       current = '';

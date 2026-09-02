@@ -1,0 +1,5 @@
+{
+  "note": "scripts/move-parser.mjs's function-signature regex had no `macro` alternative, so a public macro fun body was never modelled -- every parser-backed rule (MOV-002/004/008/011, per `grep -l move-parser rules/*.mjs`) was blind inside a macro's body. Fixed with ONE new optional regex group (`macro` between the visibility prefix and `fun`), re-arming all four rules at once, plus a one-line depth-clamp in parseParams so a lambda-typed macro param (`|u64| -> u64`) doesn't drive angle-bracket depth negative and swallow the next real comma. No rule file touched.",
+  "type": "script",
+  "script": "test.mjs"
+}
