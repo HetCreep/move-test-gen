@@ -188,7 +188,11 @@ function parseFunctionSignature(lines, startIdx, externalPrefix = '') {
   // the raw one for its own starting line, specifically so a balanced
   // paren pair inside the attribute never gets mistaken for the real
   // parameter list and truncates it early.
-  const sigLine = line.replace(/^(?:#\[[^\]]*\]\s*)+/, '');
+  // A trailing `//` comment is not code -- searching for `fun` unanchored
+  // (below) would otherwise let a comment like "// call fun helper(x) here"
+  // masquerade as a real declaration. Strip it before matching; this never
+  // affects a genuine signature, since `fun`/its params are always CODE.
+  const sigLine = line.replace(/^(?:#\[[^\]]*\]\s*)+/, '').replace(/\/\/.*$/, '');
 
   // match function declaration. `public(package) entry` / `public(friend)
   // entry` (package-scoped in name only -- `entry` makes it a PTB target
@@ -206,7 +210,19 @@ function parseFunctionSignature(lines, startIdx, externalPrefix = '') {
   // `public(package) entry macro fun f(...)` still matches (the entry
   // alternatives above consume first, `macro` consumes next), and
   // MOV-011 still fires on it unchanged.
-  const fnRegex = /^(public\s+entry\s+|public\(package\)\s+entry\s+|public\(friend\)\s+entry\s+|public\(friend\)\s+|public\(package\)\s+|public\s+|entry\s+)?(macro\s+)?fun\s+(\w+)(?:<([^>]*)>)?\s*\(/;
+  //
+  // NOT anchored with `^`: a one-line module (`module d::m { public fun
+  // f(...) { ... } }`) packs the module header, and possibly a closing
+  // brace from a prior statement, onto the SAME physical line as the
+  // function signature -- an anchored match can never reach `fun` there.
+  // Un-anchoring is a strict superset for every existing multi-line caller:
+  // a signature that already started at column 0 still matches at the same
+  // position (nothing precedes it to try first), so no prior behavior
+  // changes; it additionally finds a signature that starts mid-line. Both
+  // properties (the macro group AND the un-anchoring) are independent --
+  // merged from two branches that each added one -- so a one-line module
+  // whose function is a macro is matched too.
+  const fnRegex = /(public\s+entry\s+|public\(package\)\s+entry\s+|public\(friend\)\s+entry\s+|public\(friend\)\s+|public\(package\)\s+|public\s+|entry\s+)?(macro\s+)?fun\s+(\w+)(?:<([^>]*)>)?\s*\(/;
   const m = sigLine.match(fnRegex);
   if (!m) return null;
 
@@ -224,11 +240,14 @@ function parseFunctionSignature(lines, startIdx, externalPrefix = '') {
 
   // Where the REAL parameter list's own opening paren sits in sigLine --
   // fnRegex's match already ends with `\s*\(`, consuming exactly up to and
-  // including it, so m[0]'s length is that position. A visibility prefix
-  // can carry its own balanced parens before this point (`public(package)`,
+  // including it, so m.index + m[0].length is that position (m.index is 0
+  // for every pre-existing multi-line caller, where the signature already
+  // started at column 0; it is nonzero only for the one-line-module case
+  // the unanchored regex above now also matches). A visibility prefix can
+  // carry its own balanced parens before this point (`public(package)`,
   // `public(friend)`) -- starting the scan here, not at char 0, is what
   // keeps them from being mistaken for the parameter list itself.
-  const parenStart = m[0].length - 1;
+  const parenStart = m.index + m[0].length - 1;
 
   // collect full parameter list (may span multiple lines)
   let paramStr = '';
