@@ -13,14 +13,37 @@
  *
  * Detection: any public/entry function with a parameter whose name
  * suggests caller identity (sender, caller, user, owner, admin, signer,
- * authority, operator) AND whose type is bare `address`.
+ * authority, operator, from) AND whose type is bare `address` -- narrowed
+ * to only where the finding is actionable:
+ *
+ * 1. The function must take a `TxContext` param. The rule's own
+ *    prescribed fix, `tx_context::sender(ctx)`, needs one; a function
+ *    with no TxContext cannot apply it, so a finding there is not
+ *    actionable. This also correctly excludes a pure helper like
+ *    `verify(root, proof, amount, sender: address)`, a Merkle-leaf
+ *    check where `sender` is hashed INTO the leaf and validated against
+ *    the root -- passing someone else's address there proves only
+ *    their membership and grants the caller nothing.
+ * 2. `recipient` is not in the identity-name list. A destination names
+ *    where value is going -- a target the caller is entitled to choose
+ *    -- not an assertion about who the caller is, unlike a claimed
+ *    SOURCE (`from`), which stays spoofable in the way a chosen
+ *    destination is not.
+ *
+ * Measured false positives this closes, all three from SuiTears
+ * (eval/scenarios/08-suitears-oracle, 09-suitears-farm): airdrop.move's
+ * and linear_vesting_airdrop.move's `has_account_claimed(..., user:
+ * address): bool`, read-only views where querying another address is
+ * the intended use; airdrop_utils.move's `verify(..., sender: address):
+ * u256`, the Merkle-leaf helper above -- none of the three takes a
+ * TxContext at all.
  */
 
 const RULE_ID = 'MOV-012';
 const SEVERITY = 'HIGH';
 const TITLE = 'sender identity taken as spoofable address parameter';
 
-const IDENTITY_NAMES = /^(?:sender|caller|user|owner|admin|signer|authority|operator|from|recipient)$/i;
+const IDENTITY_NAMES = /^(?:sender|caller|user|owner|admin|signer|authority|operator|from)$/i;
 
 /**
  * @param {string} source — file content
@@ -73,13 +96,21 @@ export function check(source, filename) {
     }
     paramStr = paramStr.slice(1); // remove leading (
 
-    // parse each parameter
-    const params = paramStr.split(',').map(p => p.trim()).filter(Boolean);
-    for (const param of params) {
-      const m = param.match(/(\w+)\s*:\s*(&mut\s+|&)?\s*(\w+)/);
-      if (!m) continue;
-      const paramName = m[1];
-      const paramType = m[3];
+    // parse each parameter. The type group captures a `::`-qualified path
+    // (sui::tx_context::TxContext) whole, then resolves to its LAST segment
+    // -- never a substring test, which would re-admit MyTxContextWrapper.
+    const params = paramStr.split(',').map(p => p.trim()).filter(Boolean)
+      .map(p => p.match(/(\w+)\s*:\s*(&mut\s+|&)?\s*([\w:]+)/))
+      .filter(Boolean)
+      .map(m => ({ name: m[1], type: m[3].split('::').pop() }));
+
+    // No TxContext, no finding: the rule's own prescribed fix,
+    // tx_context::sender(ctx), needs one to call. A function with no
+    // TxContext parameter cannot apply it -- see the docstring above.
+    const hasCtx = params.some(p => p.type === 'TxContext');
+    if (!hasCtx) continue;
+
+    for (const { name: paramName, type: paramType } of params) {
       if (IDENTITY_NAMES.test(paramName) && paramType === 'address') {
         findings.push({
           rule: RULE_ID,
