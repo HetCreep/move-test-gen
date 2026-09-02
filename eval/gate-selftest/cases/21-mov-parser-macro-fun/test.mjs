@@ -34,6 +34,38 @@
  * internal comma INSIDE the pipes) is NOT covered by this clamp and
  * remains a known, disclosed residual limit -- fixing that would need
  * pipe-delimiter tracking, a second alternative beyond this unit's scope.
+ *
+ * FINDINGS-BACK from FINAL CHECK: the FIRST version of this case above
+ * tested `$a`/`$b` only after re-binding them to non-`$` LOCALS first
+ * (`let a = $a; let b = $b; a * b`) -- which never actually exercised the
+ * real gap, since a plain `a * b` was always visible. The real defect,
+ * caught by FINAL CHECK measuring the IDIOMATIC macro shape (operands
+ * used directly, no re-bind): `parseBody`'s own `multiplications`/
+ * `divisions` extraction regexes used `\w+`, which cannot match a
+ * `$`-led token AT ALL -- `$a * $b` produced ZERO entries in
+ * `fn.body.multiplications`, not a lookup miss against the params table.
+ * (The FINAL CHECK dispatch attributed this to the params-table lookup
+ * losing the `$`; that framing was independently checked here and found
+ * imprecise -- `[...'$a * $b'.matchAll(/(\w+)\s*\*\s*(\w+)/g)]` returns
+ * `[]`, so MOV-002's own `for (const mul of fn.body.multiplications)`
+ * loop never ran at all for the params-lookup step to even be reached.)
+ * Fixed by tolerating a leading `$` in THREE places: `parseOneParam`'s
+ * name capture (so `params[].name` matches the source text a macro body
+ * actually contains, e.g. "$a" not "a"), and the `multiplications` /
+ * `divisions` regexes (the actual root cause for MOV-002; `divisions`
+ * fixed as the identical twin defect immediately adjacent, even though
+ * no rule in the current four consumes it yet). Preserving `$` in
+ * `params[].name` is not merely cosmetic, verified: it also fixes a
+ * LATENT FALSE POSITIVE -- a macro multiplying two of its own
+ * `u128`-typed `$`-params (`$w * $x`, both declared `u128`) used to be
+ * flagged anyway, because `getVarType`'s `p.name === varName` lookup
+ * never matched a stripped "w" against the multiplication's own "$w"
+ * operand text; it now correctly recognizes the wide type and stays
+ * silent. Ratio, MEASURED (not copied from either side's prior claim):
+ * on an idiomatic `$`-parameter macro, MOV-002/004/008 are genuinely
+ * RE-ARMED (3 of 4); MOV-011 is N/A BY LANGUAGE RULE, not re-armed and
+ * not blind -- `entry` on a macro is illegal, so there is no bypass
+ * surface for it to ever detect there.
  */
 import { parseModule } from '../../../../scripts/move-parser.mjs';
 import { check as check002 } from '../../../../rules/mov-002-unchecked-arithmetic.mjs';
@@ -56,6 +88,37 @@ module d::m {
     }
 }`;
 assert('MOV-002 fires on an unpromoted a * b inside a macro body', check002(macroMul, 'm.move').length === 1);
+
+// ── MOV-002, the REAL gap: $-params multiplied DIRECTLY, no re-bind ────
+// (the idiomatic macro shape; the case above only ever tested a re-bound
+// local and never caught this)
+const macroMulDirect = `
+module d::m {
+    public macro fun scale($a: u64, $b: u64): u64 {
+        $a * $b
+    }
+}`;
+assert('MOV-002 fires on $a * $b used directly (the real gap, not a re-bound local)', check002(macroMulDirect, 'm.move').length === 1);
+
+const parsedDirect = parseModule(macroMulDirect);
+assert(
+  'params[].name keeps its $ prefix, matching the source text (params: $a, $b)',
+  parsedDirect.functions[0]?.params.map((p) => p.name).join(',') === '$a,$b'
+);
+
+// ── Regression: preserving $ in params[].name also fixes a LATENT FALSE
+// POSITIVE -- a macro multiplying two of its own u128-typed $-params is
+// genuinely safe and must NOT fire (getVarType must now find them) ─────
+const macroWideSafe = `
+module d::m {
+    public macro fun scale($w: u128, $x: u128): u128 {
+        $w * $x
+    }
+}`;
+assert(
+  'MOV-002 does NOT fire on two u128-typed $-params multiplied together (getVarType now finds them via the preserved $)',
+  check002(macroWideSafe, 'm.move').length === 0
+);
 
 // ── MOV-004: (w as u64) downcast inside a macro body ───────────────────
 const macroDowncast = `
@@ -148,5 +211,5 @@ if (errs.length) {
   for (const e of errs) console.log(`  ✗ ${e}`);
   process.exit(1);
 }
-console.log('macro fun re-arms MOV-002/004/008/011 (entry+macro is illegal Move, MOV-011 pinned on its nearest legal shapes); $-params and a lambda-typed param split correctly; a clean macro body and a plain-fun twin are both unaffected');
+console.log('macro fun re-arms MOV-002/004/008 (3 of 4) on idiomatic $-parameter macros; MOV-011 is N/A by language rule (entry+macro is illegal Move, pinned on its nearest legal shapes); $ preserved in params[].name fixes both the real MOV-002 gap and a latent wide-type false positive; a lambda-typed param still splits correctly; a clean macro body and a plain-fun twin are both unaffected');
 process.exit(0);

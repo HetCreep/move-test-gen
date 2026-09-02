@@ -305,8 +305,12 @@ function parseParams(paramStr) {
 
 function parseOneParam(s) {
   if (!s) return null;
-  // patterns: `name: Type`, `name: &Type`, `name: &mut Type`, `_: Type`
-  const m = s.match(/(\w+)\s*:\s*(&mut\s+|&)?(.+)/);
+  // patterns: `name: Type`, `name: &Type`, `name: &mut Type`, `_: Type`,
+  // `$name: Type` (a macro's own expression/type parameter -- Move 2024
+  // prefixes both with `$`; keeping it here is what lets the body-level
+  // extraction below match the SAME source text a macro body actually
+  // uses, e.g. `$a * $b`, rather than a name the source never contains).
+  const m = s.match(/(\$?\w+)\s*:\s*(&mut\s+|&)?(.+)/);
   if (!m) return null;
   // clean trailing parens/commas/whitespace from type
   const rawType = m[3].trim().replace(/[),;\s]+$/, '');
@@ -454,8 +458,12 @@ function parseBody(bodyLines, offset) {
       });
     }
 
-    // multiplications
-    for (const mm of codeOnly.matchAll(/(\w+)\s*\*\s*(\w+)/g)) {
+    // multiplications. `\$?` tolerates a macro's own `$`-prefixed
+    // parameter used directly as an operand (`$a * $b`) -- without it,
+    // `\w+` cannot match a `$`-led token at all, so a macro body
+    // multiplying two of its own params was invisible here, not merely
+    // mis-typed: MOV-002 had nothing in `multiplications` to iterate.
+    for (const mm of codeOnly.matchAll(/(\$?\w+)\s*\*\s*(\$?\w+)/g)) {
       multiplications.push({
         line: lineNo,
         left: mm[1],
@@ -465,8 +473,10 @@ function parseBody(bodyLines, offset) {
       });
     }
 
-    // divisions
-    for (const dm of codeOnly.matchAll(/(\w+)\s*\/\s*(\w+)/g)) {
+    // divisions -- same `\$?` tolerance, same reason, kept in sync with
+    // the multiplication regex directly above rather than left as a
+    // matching twin with the identical unfixed gap.
+    for (const dm of codeOnly.matchAll(/(\$?\w+)\s*\/\s*(\$?\w+)/g)) {
       divisions.push({
         line: lineNo,
         numerator: dm[1],
