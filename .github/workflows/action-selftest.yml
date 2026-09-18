@@ -1,0 +1,72 @@
+name: action-selftest
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: action-selftest-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  layer1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./
+        with:
+          sources: eval/gate-selftest/cases/04-shared-code-warning/sources
+          tests: eval/gate-selftest/cases/04-shared-code-warning/tests
+  layer2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install sui CLI
+        run: |
+          SUI_VERSION="mainnet-v1.74.1"
+          SUI_SHA256="f6ea1f0d0bd61dcb8a3630b3e764c5373ee24e0992a87c1087858b1ec4af0481"
+          curl -fsSL -o sui.tgz "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz"
+          echo "${SUI_SHA256}  sui.tgz" | sha256sum -c -
+          tar xzf sui.tgz
+          sudo mv sui /usr/local/bin/
+          rm sui.tgz
+          sui --version
+      - uses: ./
+        with:
+          sources: examples/sources
+          tests: examples/tests
+          mutate: 'true'
+  layer3-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Lint through the action on a clean tree (must pass)
+        uses: ./
+        with:
+          sources: eval/gate-selftest/cases/04-shared-code-warning/sources
+          tests: eval/gate-selftest/cases/04-shared-code-warning/tests
+          lint: 'true'
+      - name: Lint must FAIL on a tree with HIGH findings
+        shell: bash
+        run: |
+          GATE="${GITHUB_WORKSPACE}/scripts/check-coverage.mjs"
+          set +e
+          node "$GATE" examples/sources examples/tests --lint > /tmp/lint-out.txt 2>&1
+          rc=$?
+          set -e
+          cat /tmp/lint-out.txt
+          if [ "$rc" -eq 0 ]; then
+            echo "FAIL: examples/sources has HIGH findings but the gate exited 0"
+            exit 1
+          fi
+          grep -q "Security Lint" /tmp/lint-out.txt || { echo "FAIL: lint did not run"; exit 1; }
+          echo "lint exited $rc on a tree with HIGH findings, as expected"

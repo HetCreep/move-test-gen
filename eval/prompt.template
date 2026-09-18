@@ -1,0 +1,8 @@
+Use the move-test-gen skill to generate a complete edge-case test suite for the
+module at sources/{{MODULE_FILE}} in this package.
+
+Standing protections (never remove a line from this template — fill placeholders only):
+- write ALL tests to tests/generated_tests.move and nowhere else
+- do NOT modify anything under sources/
+- every #[expected_failure] test must name its abort_code
+- do NOT read any file outside this scenario's directory while generating

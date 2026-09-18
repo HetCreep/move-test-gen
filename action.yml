@@ -1,0 +1,130 @@
+name: 'move-test-gen coverage check'
+description: 'Assert pairing, mutation testing, and security lint for Sui Move packages'
+branding:
+  icon: 'eye'
+  color: 'purple'
+inputs:
+  sources:
+    description: 'Path to Move sources directory'
+    required: true
+    default: 'sources'
+  tests:
+    description: 'Path to Move tests directory'
+    required: true
+    default: 'tests'
+  mutate:
+    description: 'Run mutation testing (requires sui CLI on PATH)'
+    required: false
+    default: 'false'
+  scope:
+    description: 'Comma-separated list of files to mutate (target only)'
+    required: false
+    default: ''
+  lint:
+    description: 'Run security pattern detection (9 rules: MOV-001–MOV-006, MOV-008, MOV-011, MOV-012)'
+    required: false
+    default: 'false'
+  disable:
+    description: 'Comma-separated rule IDs to disable repo-wide, e.g. MOV-003,MOV-006'
+    required: false
+    default: ''
+  fail-on:
+    description: 'Lint severity that fails the build: critical | high | medium | low | none'
+    required: false
+    default: 'high'
+outputs:
+  coverage-percent:
+    description: 'Assert coverage percentage'
+    value: ${{ steps.gate.outputs.coverage-percent }}
+  unpaired-count:
+    description: 'Number of asserts with no expected_failure test'
+    value: ${{ steps.gate.outputs.unpaired-count }}
+  mutation-score:
+    description: 'Mutation score, or empty when Layer 2 did not run'
+    value: ${{ steps.gate.outputs.mutation-score }}
+  survivor-count:
+    description: 'Surviving mutants, or empty when Layer 2 did not run'
+    value: ${{ steps.gate.outputs.survivor-count }}
+  lint-findings:
+    description: 'Number of lint findings, or empty when --lint was not requested'
+    value: ${{ steps.gate.outputs.lint-findings }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: 20
+    - name: Run coverage check
+      id: gate
+      shell: bash
+      env:
+        MTG_SOURCES: ${{ inputs.sources }}
+        MTG_TESTS: ${{ inputs.tests }}
+        MTG_MUTATE: ${{ inputs.mutate }}
+        MTG_SCOPE: ${{ inputs.scope }}
+        MTG_LINT: ${{ inputs.lint }}
+        MTG_DISABLE: ${{ inputs.disable }}
+        MTG_FAIL_ON: ${{ inputs.fail-on }}
+      run: |
+        GATE="${GITHUB_ACTION_PATH}/scripts/check-coverage.mjs"
+
+        # Accept the spellings a human actually writes. An unrecognised value is
+        # an error rather than a silent "false": the failure mode of the old
+        # `= "true"` test was a green Layer-1-only run that looked complete.
+        is_true() {
+          case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+            true|yes|y|on|1) return 0 ;;
+            false|no|n|off|0|'') return 1 ;;
+            *) echo "move-test-gen: unrecognised boolean value '$1' for $2" >&2; exit 2 ;;
+          esac
+        }
+
+        args=( "$MTG_SOURCES" "$MTG_TESTS" )
+        is_true "$MTG_MUTATE" mutate && args+=( --mutate )
+        [ -n "$MTG_SCOPE" ] && args+=( --scope "$MTG_SCOPE" )
+        is_true "$MTG_LINT" lint && args+=( --lint )
+        [ -n "$MTG_DISABLE" ] && args+=( --disable "$MTG_DISABLE" )
+        [ -n "$MTG_FAIL_ON" ] && args+=( --fail-on "$MTG_FAIL_ON" )
+        args+=( --json "${RUNNER_TEMP:-/tmp}/move-test-gen.json" )
+        set +e
+        node "$GATE" "${args[@]}"
+        gate_rc=$?
+        set -e
+
+        REPORT="${RUNNER_TEMP:-/tmp}/move-test-gen.json"
+        if [ -f "$REPORT" ]; then
+          node -e '
+            const fs = require("fs");
+            const r = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const out = process.env.GITHUB_OUTPUT;
+            const put = (k, v) => fs.appendFileSync(out, `${k}=${v ?? ""}\n`);
+            put("coverage-percent", r.coverage.percent);
+            put("unpaired-count", r.coverage.unpaired.length);
+            put("mutation-score", r.mutation && !r.mutation.skipped ? r.mutation.score : "");
+            put("survivor-count", r.mutation && !r.mutation.skipped ? r.mutation.survived : "");
+            put("lint-findings", r.lint ? r.lint.findings.length : "");
+
+            const s = process.env.GITHUB_STEP_SUMMARY;
+            if (s) {
+              const coveragePct = r.coverage.percent === null
+                ? "n/a"
+                : `${r.coverage.percent}%`;
+              const rows = [
+                ["Assert coverage", `${coveragePct} (${r.coverage.covered}/${r.coverage.total})`],
+                ["Unpaired asserts", String(r.coverage.unpaired.length)],
+              ];
+              if (r.mutation && !r.mutation.skipped) {
+                rows.push(["Mutation score", `${r.mutation.score}%`]);
+                rows.push(["Surviving mutants", String(r.mutation.survived)]);
+              } else if (r.mutation) {
+                rows.push(["Mutation", "requested, could not run"]);
+              }
+              if (r.lint) rows.push(["Lint findings", String(r.lint.findings.length)]);
+              fs.appendFileSync(s,
+                "### move-test-gen\n\n| | |\n|---|---|\n" +
+                rows.map(([k, v]) => `| ${k} | ${v} |`).join("\n") + "\n");
+            }
+          ' "$REPORT"
+        fi
+        exit $gate_rc

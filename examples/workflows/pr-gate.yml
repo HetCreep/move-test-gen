@@ -1,0 +1,17 @@
+# Add to .github/workflows/move-coverage.yml in your Move repo
+# Layer 1 only — no sui needed, runs in seconds
+name: move-coverage
+on: [pull_request]
+permissions:
+  contents: read
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: talongate/move-test-gen@3afcb1a731e058835c622475b6203b42a4b52d84 # v1.6.0
+        with:
+          sources: sources
+          tests: tests

@@ -1,0 +1,31 @@
+# Add to .github/workflows/move-mutation.yml in your Move repo
+# Layer 1 + Layer 2 — requires sui CLI, runs nightly
+name: move-mutation
+on:
+  schedule:
+    - cron: '0 3 * * *'  # 3 AM UTC daily
+  workflow_dispatch:       # manual trigger
+permissions:
+  contents: read
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install sui CLI
+        run: |
+          SUI_VERSION="mainnet-v1.74.1"
+          SUI_SHA256="f6ea1f0d0bd61dcb8a3630b3e764c5373ee24e0992a87c1087858b1ec4af0481"
+          curl -fsSL -o sui.tgz "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz"
+          echo "${SUI_SHA256}  sui.tgz" | sha256sum -c -
+          tar xzf sui.tgz
+          sudo mv sui /usr/local/bin/
+          rm sui.tgz
+          sui --version
+      - uses: talongate/move-test-gen@3afcb1a731e058835c622475b6203b42a4b52d84 # v1.6.0
+        with:
+          sources: sources
+          tests: tests
+          mutate: 'true'

@@ -1,0 +1,21 @@
+{
+  "name": "move-test-gen",
+  "version": "1.6.0",
+  "description": "Coverage checker + security linter for Sui Move \u2014 assert pairing, mutation testing, 9 lint rules",
+  "type": "module",
+  "bin": {
+    "move-test-gen": "scripts/check-coverage.mjs"
+  },
+  "files": [
+    "scripts/",
+    "rules/"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/talongate/move-test-gen"
+  },
+  "license": "MIT"
+}
