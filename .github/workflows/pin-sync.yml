@@ -20,7 +20,29 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20
-      - run: node scripts/check-pins.mjs
+      - name: check-pins passes, and sees every example workflow
+        shell: bash
+        run: |
+          node scripts/check-pins.mjs > /tmp/pin-check-out.txt 2>&1
+          rc=$?
+          cat /tmp/pin-check-out.txt
+          if [ "$rc" -ne 0 ]; then
+            echo "FAIL: check-pins should exit 0 on a correctly-pinned tree (got $rc)"
+            exit 1
+          fi
+          # A regression that NARROWS the scan (fewer references found
+          # than exist) would still exit 0 above, and the single-file
+          # corruption step below only proves ONE reference is still
+          # seen -- neither catches partial blindness. Derived from the
+          # glob, never a hard-coded count of "the two example
+          # workflows": a count rots the day a third example lands,
+          # which is exactly the class this checker exists to catch.
+          missing=0
+          for f in examples/workflows/*.yml; do
+            grep -qF "$f" /tmp/pin-check-out.txt || { echo "FAIL: $f is not named in check-pins output -- the scan may have narrowed"; missing=1; }
+          done
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+          echo "check-pins saw every examples/workflows/*.yml file"
       - name: check-pins must FAIL on a corrupted pin
         shell: bash
         run: |
