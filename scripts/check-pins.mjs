@@ -58,7 +58,12 @@ const REF_PREFIX = `${OWNER}/${REPO_NAME}`;
 // before it) captures the SHA cleanly instead of swallowing the `#` and
 // everything after it into one unrecognizable token; TRAILING_COMMENT_RE
 // below still finds that comment independently, against the whole line.
-const REF_RE = new RegExp(`${REF_PREFIX.replace(/\//g, '\\/')}(?:\\/[^\\s@]+)?@([^\\s#]+)`, 'g');
+// The capture may be EMPTY (`*`, not `+`): `...@# v1.6.1` has no ref at
+// all, and requiring one character made such a line invisible to the
+// scan instead of reported. An empty token falls through classifyRef to
+// "unrecognized". Cost: a bare `<owner>/<repo>@` in prose with nothing
+// after it is now flagged too; that shape has no innocent reading here.
+const REF_RE = new RegExp(`${REF_PREFIX.replace(/\//g, '\\/')}(?:\\/[^\\s@]+)?@([^\\s#]*)`, 'g');
 const SHA_RE = /^[0-9a-f]{40}$/i;
 // The core `vX.Y.Z` is captured on its own; an optional SemVer
 // pre-release/build suffix (`-beta.1`, `+build.5`) is recognized as part
@@ -121,8 +126,13 @@ function readReleaseInfo() {
     // this file's whole header exists to hold.
     sha = execFileSync('git', ['rev-parse', `${tag}^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   } catch (err) {
+    // This catch sees EVERY way `git rev-parse` can fail, not only a
+    // missing tag (not a repo, git absent, a locked or corrupt repo), so
+    // the usual-cause explanation is a hypothesis and git's own first
+    // line rides beside it as the evidence -- still one line.
+    const said = String(err.stderr || '').trim().split('\n')[0] || err.code || 'no output';
     throw new Error(
-      `tag ${tag} does not resolve to a commit -- package.json declares version ${version}, but no such tag exists yet (either the checkout needs fetch-depth: 0, or the version was bumped before the tag was cut -- see RELEASE.md's own ordering)`,
+      `tag ${tag} does not resolve to a commit -- package.json declares version ${version}; the usual causes are a checkout without tags (needs fetch-depth: 0) or a version bumped before the tag was cut (see RELEASE.md's own ordering); git said: ${said}`,
       { cause: err },
     );
   }
@@ -184,6 +194,11 @@ function findReferences() {
  * (`uses: ...@v1.6.1 # v1.5.0`) passed silently. A stale annotation
  * beside a correct pin is exactly the "docs say one thing, the pin says
  * another" confusion this checker exists to end.
+ *
+ * The comment is read from the whole line, so on a line carrying two
+ * references it applies to both. Deliberate: a stale version note on a
+ * documentation line is a defect whichever reference it sits beside, and
+ * a `uses:` line in a workflow never carries two.
  */
 function classifyRef(ref, release) {
   const token = ref.ref;
